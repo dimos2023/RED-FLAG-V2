@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 const HOLD_TITLE_MS = 2600;
 const GATHER_DURATION_S = 1.55;
-const VIDEO_FALLBACK_MS = 9000;
+const VIDEO_FALLBACK_MS = 16000;
 const MASTER_INTRO_MAX_MS = 22000;
 const REVEAL_DURATION_S = 1.45;
 const VIDEO_SRC = "/intro.mp4";
@@ -90,6 +90,7 @@ function AliveRedFlagTitle({ phase }: { phase: Phase }) {
 
 export function IntroCurtain({ children }: IntroCurtainProps) {
   const [phase, setPhase] = useState<Phase>("intro");
+  const [requiresTapToPlay, setRequiresTapToPlay] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -99,10 +100,7 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
     const skipIntro: boolean = new URLSearchParams(window.location.search).has(
       "skipintro",
     );
-    if (
-      skipIntro ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (skipIntro) {
       setPhase("done");
       return;
     }
@@ -116,10 +114,7 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
     if (typeof window === "undefined") {
       return;
     }
-    if (
-      new URLSearchParams(window.location.search).has("skipintro") ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (new URLSearchParams(window.location.search).has("skipintro")) {
       return;
     }
     const t: number = window.setTimeout(() => {
@@ -143,17 +138,47 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
       return;
     }
     const video = videoRef.current;
+    const attemptPlayback = async (): Promise<void> => {
+      if (!video) {
+        return;
+      }
+      video.muted = true;
+      video.defaultMuted = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "true");
+      try {
+        await video.play();
+        setRequiresTapToPlay(false);
+      } catch {
+        setRequiresTapToPlay(true);
+      }
+    };
     if (video) {
       video.currentTime = 0;
-      void video.play().catch(() => {
-        setPhase("done");
-      });
+      void attemptPlayback();
     }
     const fallbackTimer: number = window.setTimeout(() => {
       setPhase("done");
     }, VIDEO_FALLBACK_MS);
     return () => window.clearTimeout(fallbackTimer);
   }, [phase]);
+
+  async function handleTapToPlay(): Promise<void> {
+    const video = videoRef.current;
+    if (!video) {
+      setPhase("done");
+      return;
+    }
+    try {
+      video.muted = true;
+      video.defaultMuted = true;
+      await video.play();
+      setRequiresTapToPlay(false);
+    } catch {
+      setPhase("done");
+    }
+  }
 
   const easeGather: [number, number, number, number] = [0.76, 0, 0.14, 1];
   const easeReveal: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -301,12 +326,34 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
                 ref={videoRef}
                 className="h-full w-full object-cover"
                 src={VIDEO_SRC}
+                autoPlay
                 muted
                 playsInline
+                controls={false}
                 preload="auto"
                 onEnded={() => setPhase("done")}
                 onError={() => setPhase("done")}
+                onCanPlay={() => {
+                  if (phase === "video") {
+                    void videoRef.current?.play().catch(() => {
+                      setRequiresTapToPlay(true);
+                    });
+                  }
+                }}
               />
+              {requiresTapToPlay ? (
+                <div className="pointer-events-auto absolute inset-0 z-[65] flex items-center justify-center bg-black/35 px-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleTapToPlay();
+                    }}
+                    className="rounded-xl border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm"
+                  >
+                    Tap to start intro video
+                  </button>
+                </div>
+              ) : null}
             </motion.div>
             <motion.div
               className="pointer-events-none absolute inset-x-0 top-0 h-[18%] bg-gradient-to-b from-black via-black/80 to-transparent"
