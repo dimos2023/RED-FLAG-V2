@@ -324,7 +324,7 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
             >
               <video
                 ref={videoRef}
-                className="h-full w-full object-cover"
+                className="h-full w-full bg-black object-contain md:object-cover"
                 src={VIDEO_SRC}
                 autoPlay
                 muted
