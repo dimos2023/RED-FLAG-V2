@@ -8,7 +8,7 @@ const GATHER_DURATION_S = 1.55;
 const VIDEO_FALLBACK_MS = 16000;
 const MASTER_INTRO_MAX_MS = 22000;
 const REVEAL_DURATION_S = 1.45;
-const VIDEO_SRC = "/intro.mp4";
+const VIDEO_SRC = "/intro2.mp4";
 
 type Phase = "intro" | "open" | "video" | "done";
 
