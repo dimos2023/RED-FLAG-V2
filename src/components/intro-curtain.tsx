@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -14,7 +15,10 @@ const GATHER_DURATION_S = 1.55;
 const VIDEO_FALLBACK_MS = 16000;
 const MASTER_INTRO_MAX_MS = 22000;
 const REVEAL_DURATION_S = 1.45;
+const VIDEO_PLAY_RETRY_MS = 160;
+const VIDEO_PLAY_RETRY_ATTEMPTS = 18;
 const VIDEO_SRC = "/intro2.mp4";
+const INTRO_SESSION_STORAGE_KEY = "red-flag-intro-completed";
 
 type Phase = "intro" | "open" | "video" | "done";
 
@@ -96,37 +100,80 @@ function AliveRedFlagTitle({ phase }: { phase: Phase }) {
 
 export function IntroCurtain({ children }: IntroCurtainProps) {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [requiresTapToPlay, setRequiresTapToPlay] = useState<boolean>(false);
+  const phaseRef = useRef<Phase>(phase);
+  phaseRef.current = phase;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hasCompletedIntroBeforeRef = useRef<boolean>(false);
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      if (window.sessionStorage.getItem(INTRO_SESSION_STORAGE_KEY) === "1") {
+        hasCompletedIntroBeforeRef.current = true;
+        setPhase("done");
+      }
+    } catch {
+      /* private mode or storage blocked */
+    }
+  }, []);
   const attemptIntroPlayback = useCallback(async (): Promise<void> => {
     const video = videoRef.current;
-    if (!video) {
+    if (!video || phaseRef.current !== "video") {
       return;
     }
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "true");
+    video.volume = 1;
     video.muted = false;
     video.defaultMuted = false;
     video.removeAttribute("muted");
-    try {
-      await video.play();
-      setRequiresTapToPlay(false);
+    for (let i = 0; i < VIDEO_PLAY_RETRY_ATTEMPTS; i += 1) {
+      if (phaseRef.current !== "video") {
+        return;
+      }
+      try {
+        await video.play();
+        return;
+      } catch {
+        if (i < VIDEO_PLAY_RETRY_ATTEMPTS - 1) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, VIDEO_PLAY_RETRY_MS);
+          });
+        }
+      }
+    }
+    if (phaseRef.current !== "video") {
       return;
-    } catch {
-      /* Autoplay with sound is often blocked; fall back to muted then offer tap for audio. */
     }
     video.muted = true;
     video.defaultMuted = true;
     video.setAttribute("muted", "");
     try {
       await video.play();
-      setRequiresTapToPlay(true);
     } catch {
-      setRequiresTapToPlay(true);
+      /* Video may still be blocked; onEnded/onError will advance. */
     }
   }, []);
 
   useEffect(() => {
+    if (phase !== "done") {
+      return;
+    }
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(INTRO_SESSION_STORAGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }, [phase]);
+
+  useEffect(() => {
+    if (hasCompletedIntroBeforeRef.current) {
+      return;
+    }
     if (typeof window === "undefined") {
       return;
     }
@@ -144,6 +191,9 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
   }, []);
 
   useEffect(() => {
+    if (hasCompletedIntroBeforeRef.current) {
+      return;
+    }
     if (typeof window === "undefined") {
       return;
     }
@@ -180,23 +230,6 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
     }, VIDEO_FALLBACK_MS);
     return () => window.clearTimeout(fallbackTimer);
   }, [phase, attemptIntroPlayback]);
-
-  async function handleTapToPlay(): Promise<void> {
-    const video = videoRef.current;
-    if (!video) {
-      setPhase("done");
-      return;
-    }
-    try {
-      video.muted = false;
-      video.defaultMuted = false;
-      video.removeAttribute("muted");
-      await video.play();
-      setRequiresTapToPlay(false);
-    } catch {
-      setPhase("done");
-    }
-  }
 
   const easeGather: [number, number, number, number] = [0.76, 0, 0.14, 1];
   const easeReveal: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -344,31 +377,18 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
                 ref={videoRef}
                 className="h-full w-full bg-black object-contain md:object-cover"
                 src={VIDEO_SRC}
-                autoPlay
                 playsInline
                 controls={false}
                 preload="auto"
                 onEnded={() => setPhase("done")}
                 onError={() => setPhase("done")}
                 onCanPlay={() => {
-                  if (phase === "video") {
-                    void attemptIntroPlayback();
+                  if (phaseRef.current !== "video") {
+                    return;
                   }
+                  void attemptIntroPlayback();
                 }}
               />
-              {requiresTapToPlay ? (
-                <div className="pointer-events-auto absolute inset-0 z-[65] flex items-center justify-center bg-black/35 px-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleTapToPlay();
-                    }}
-                    className="rounded-xl border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm"
-                  >
-                    Tap to play intro with sound
-                  </button>
-                </div>
-              ) : null}
             </motion.div>
             <motion.div
               className="pointer-events-none absolute inset-x-0 top-0 h-[18%] bg-gradient-to-b from-black via-black/80 to-transparent"
