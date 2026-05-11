@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { markProfileVerified } from "@/lib/supabase/profile_registration";
 import type { AccountType, UserProfile } from "@/types";
 import { TERMS_VERSION } from "@/lib/terms_of_service";
 
@@ -34,8 +35,10 @@ type AuthContextValue = {
     password: string;
     accountType: AccountType;
     hasAcceptedTerms: boolean;
+    registration?: Partial<UserProfile>;
   }) => Promise<boolean>;
   completeVerificationDemo: (params: {
+    accountType: AccountType;
     phone?: string;
     commercialRegistry?: string;
     companyEmail?: string;
@@ -52,6 +55,23 @@ type ProfileRow = {
   commercial_registry: string | null;
   company_email: string | null;
   is_verified: boolean | null;
+  full_legal_name: string | null;
+  shipping_line1: string | null;
+  shipping_line2: string | null;
+  shipping_city: string | null;
+  shipping_region: string | null;
+  shipping_postal_code: string | null;
+  shipping_country: string | null;
+  company_legal_name: string | null;
+  company_address_line1: string | null;
+  company_address_line2: string | null;
+  company_city: string | null;
+  company_region: string | null;
+  company_postal_code: string | null;
+  company_country: string | null;
+  company_location_note: string | null;
+  national_id_storage_path: string | null;
+  commercial_registry_storage_paths: string[] | null;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -216,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase
       .from("profiles")
       .select(
-        "account_type, terms_version, phone, commercial_registry, company_email, is_verified",
+        "account_type, terms_version, phone, commercial_registry, company_email, is_verified, full_legal_name, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path, commercial_registry_storage_paths",
       )
       .eq("id", supabaseUser.id)
       .maybeSingle()
@@ -226,7 +246,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const row: ProfileRow = data as ProfileRow;
         setUser((prev) => {
-          const fallback: UserProfile = prev ?? buildProfileFromAuthUser(supabaseUser);
+          const fallback: UserProfile =
+            prev ?? buildProfileFromAuthUser(supabaseUser);
+          const paths: string[] | undefined =
+            Array.isArray(row.commercial_registry_storage_paths)
+              ? row.commercial_registry_storage_paths
+              : undefined;
           const next: UserProfile = {
             ...fallback,
             accountType:
@@ -244,6 +269,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             commercialRegistry:
               row.commercial_registry ?? fallback.commercialRegistry,
             companyEmail: row.company_email ?? fallback.companyEmail,
+            fullLegalName: row.full_legal_name ?? fallback.fullLegalName,
+            shippingLine1: row.shipping_line1 ?? fallback.shippingLine1,
+            shippingLine2: row.shipping_line2 ?? fallback.shippingLine2,
+            shippingCity: row.shipping_city ?? fallback.shippingCity,
+            shippingRegion: row.shipping_region ?? fallback.shippingRegion,
+            shippingPostalCode:
+              row.shipping_postal_code ?? fallback.shippingPostalCode,
+            shippingCountry: row.shipping_country ?? fallback.shippingCountry,
+            companyLegalName:
+              row.company_legal_name ?? fallback.companyLegalName,
+            companyAddressLine1:
+              row.company_address_line1 ?? fallback.companyAddressLine1,
+            companyAddressLine2:
+              row.company_address_line2 ?? fallback.companyAddressLine2,
+            companyCity: row.company_city ?? fallback.companyCity,
+            companyRegion: row.company_region ?? fallback.companyRegion,
+            companyPostalCode:
+              row.company_postal_code ?? fallback.companyPostalCode,
+            companyCountry: row.company_country ?? fallback.companyCountry,
+            companyLocationNote:
+              row.company_location_note ?? fallback.companyLocationNote,
+            nationalIdStoragePath:
+              row.national_id_storage_path ?? fallback.nationalIdStoragePath,
+            commercialRegistryStoragePaths:
+              paths ?? fallback.commercialRegistryStoragePaths,
           };
           writeStoredProfile(next);
           return next;
@@ -299,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: string;
       accountType: AccountType;
       hasAcceptedTerms: boolean;
+      registration?: Partial<UserProfile>;
     }): Promise<boolean> => {
       if (!params.hasAcceptedTerms) {
         return false;
@@ -322,12 +373,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         return !error;
       }
+      const reg: Partial<UserProfile> = params.registration ?? {};
       const profile: UserProfile = {
         id: `demo-${crypto.randomUUID()}`,
         email: params.email,
         accountType: params.accountType,
         hasAcceptedTerms: true,
         isVerified: false,
+        ...reg,
       };
       setUser(profile);
       writeStoredProfile(profile);
@@ -338,6 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const completeVerificationDemo = useCallback(
     async (params: {
+      accountType: AccountType;
       phone?: string;
       commercialRegistry?: string;
       companyEmail?: string;
@@ -345,6 +399,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isDemoMode && supabase) {
         const { data, error } = await supabase.auth.getUser();
         if (error || !data.user) {
+          return false;
+        }
+        const verified = await markProfileVerified(supabase, data.user.id, {
+          phone: params.phone,
+          commercialRegistry: params.commercialRegistry,
+          companyEmail: params.companyEmail,
+          accountType: params.accountType,
+        });
+        if (!verified.ok) {
           return false;
         }
         const { error: updateError } = await supabase.auth.updateUser({
@@ -355,7 +418,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             company_email: params.companyEmail,
           },
         });
-        return !updateError;
+        if (updateError) {
+          return false;
+        }
+        await syncSessionFromSupabase();
+        return true;
       }
       let ok: boolean = false;
       setUser((prev) => {
@@ -376,7 +443,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return ok;
     },
-    [isDemoMode, supabase],
+    [isDemoMode, supabase, syncSessionFromSupabase],
   );
 
   const signOut = useCallback(() => {

@@ -12,6 +12,23 @@ create table if not exists public.profiles (
   commercial_registry text,
   company_email text,
   is_verified boolean not null default false,
+  full_legal_name text,
+  shipping_line1 text,
+  shipping_line2 text,
+  shipping_city text,
+  shipping_region text,
+  shipping_postal_code text,
+  shipping_country text,
+  company_legal_name text,
+  company_address_line1 text,
+  company_address_line2 text,
+  company_city text,
+  company_region text,
+  company_postal_code text,
+  company_country text,
+  company_location_note text,
+  national_id_storage_path text,
+  commercial_registry_storage_paths text[],
   created_at timestamptz not null default now()
 );
 

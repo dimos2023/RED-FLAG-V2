@@ -7,8 +7,9 @@ import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { uploadFraudEvidence } from "@/lib/supabase/storage";
+import { upsertRegistrationProfile } from "@/lib/supabase/profile_registration";
 import { TERMS_FULL_TEXT, TERMS_VERSION } from "@/lib/terms_of_service";
-import type { AccountType } from "@/types";
+import type { AccountType, UserProfile } from "@/types";
 
 const DEMO_OTP = "123456";
 
@@ -116,11 +117,36 @@ function RegisterPageContent() {
       }
     }
     setPending(true);
+    const registrationPartial: Partial<UserProfile> =
+      accountType === "individual"
+        ? {
+            phone: phone.trim(),
+            fullLegalName: fullLegalName.trim(),
+            shippingLine1: shippingLine1.trim(),
+            shippingLine2: shippingLine2.trim(),
+            shippingCity: shippingCity.trim(),
+            shippingRegion: shippingRegion.trim(),
+            shippingPostalCode: shippingPostalCode.trim(),
+            shippingCountry: shippingCountry.trim(),
+          }
+        : {
+            commercialRegistry: crNumber.trim(),
+            companyEmail: companyEmail.trim(),
+            companyLegalName: companyLegalName.trim(),
+            companyAddressLine1: companyAddressLine1.trim(),
+            companyAddressLine2: companyAddressLine2.trim(),
+            companyCity: companyCity.trim(),
+            companyRegion: companyRegion.trim(),
+            companyPostalCode: companyPostalCode.trim(),
+            companyCountry: companyCountry.trim(),
+            companyLocationNote: companyLocationNote.trim(),
+          };
     const ok: boolean = await signUpDemo({
       email,
       password,
       accountType,
       hasAcceptedTerms: acceptedTerms,
+      registration: registrationPartial,
     });
     if (!ok) {
       setPending(false);
@@ -130,35 +156,78 @@ function RegisterPageContent() {
     const sb = createSupabaseBrowserClient();
     if (sb) {
       const { data: authData } = await sb.auth.getUser();
-      if (authData.user) {
-        if (accountType === "individual" && nationalIdFile) {
-          const up = await uploadFraudEvidence(sb, authData.user.id, {
-            file: nationalIdFile,
-            reportFolder: "national-id",
+      if (!authData.user) {
+        setPending(false);
+        setError("Session not ready after signup. Try signing in.");
+        return;
+      }
+      const userId: string = authData.user.id;
+      let nationalIdStoragePath = "";
+      const commercialPaths: string[] = [];
+      if (accountType === "individual" && nationalIdFile) {
+        const up = await uploadFraudEvidence(sb, userId, {
+          file: nationalIdFile,
+          reportFolder: "national-id",
+        });
+        if (!up.ok) {
+          setPending(false);
+          setError(
+            `Account created but ID upload failed: ${up.message}. Try again from support.`,
+          );
+          return;
+        }
+        nationalIdStoragePath = up.path;
+      }
+      if (accountType === "company") {
+        for (const file of companyRegistryFiles) {
+          const up = await uploadFraudEvidence(sb, userId, {
+            file,
+            reportFolder: "commercial-registry",
           });
           if (!up.ok) {
             setPending(false);
             setError(
-              `Account created but ID upload failed: ${up.message}. Try again from support.`,
+              `Account created but document upload failed: ${up.message}.`,
             );
             return;
           }
+          commercialPaths.push(up.path);
         }
-        if (accountType === "company") {
-          for (const file of companyRegistryFiles) {
-            const up = await uploadFraudEvidence(sb, authData.user.id, {
-              file,
-              reportFolder: "commercial-registry",
+      }
+      const upsertResult =
+        accountType === "individual"
+          ? await upsertRegistrationProfile(sb, {
+              userId,
+              accountType: "individual",
+              phone: phone.trim(),
+              fullLegalName: fullLegalName.trim(),
+              shippingLine1: shippingLine1.trim(),
+              shippingLine2: shippingLine2.trim(),
+              shippingCity: shippingCity.trim(),
+              shippingRegion: shippingRegion.trim(),
+              shippingPostalCode: shippingPostalCode.trim(),
+              shippingCountry: shippingCountry.trim(),
+              nationalIdStoragePath,
+            })
+          : await upsertRegistrationProfile(sb, {
+              userId,
+              accountType: "company",
+              commercialRegistry: crNumber.trim(),
+              companyEmail: companyEmail.trim(),
+              companyLegalName: companyLegalName.trim(),
+              companyAddressLine1: companyAddressLine1.trim(),
+              companyAddressLine2: companyAddressLine2.trim(),
+              companyCity: companyCity.trim(),
+              companyRegion: companyRegion.trim(),
+              companyPostalCode: companyPostalCode.trim(),
+              companyCountry: companyCountry.trim(),
+              companyLocationNote: companyLocationNote.trim(),
+              commercialRegistryStoragePaths: commercialPaths,
             });
-            if (!up.ok) {
-              setPending(false);
-              setError(
-                `Account created but document upload failed: ${up.message}.`,
-              );
-              return;
-            }
-          }
-        }
+      if (!upsertResult.ok) {
+        setPending(false);
+        setError(`Could not save registration data: ${upsertResult.message}`);
+        return;
       }
     }
     setPending(false);
@@ -177,7 +246,10 @@ function RegisterPageContent() {
       return;
     }
     setPending(true);
-    const verified: boolean = await completeVerificationDemo({ phone });
+    const verified: boolean = await completeVerificationDemo({
+      accountType: "individual",
+      phone,
+    });
     if (!verified) {
       setPending(false);
       setError("Verification failed. Try signing in again.");
@@ -200,6 +272,7 @@ function RegisterPageContent() {
     }
     setPending(true);
     const verified: boolean = await completeVerificationDemo({
+      accountType: "company",
       commercialRegistry: crNumber,
       companyEmail,
     });
