@@ -27,7 +27,23 @@ function RegisterPageContent() {
   const [phone, setPhone] = useState<string>("");
   const [otp, setOtp] = useState<string>("");
   const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
+  const [fullLegalName, setFullLegalName] = useState<string>("");
+  const [shippingLine1, setShippingLine1] = useState<string>("");
+  const [shippingLine2, setShippingLine2] = useState<string>("");
+  const [shippingCity, setShippingCity] = useState<string>("");
+  const [shippingRegion, setShippingRegion] = useState<string>("");
+  const [shippingPostalCode, setShippingPostalCode] = useState<string>("");
+  const [shippingCountry, setShippingCountry] = useState<string>("");
+  const [companyLegalName, setCompanyLegalName] = useState<string>("");
   const [crNumber, setCrNumber] = useState<string>("");
+  const [companyAddressLine1, setCompanyAddressLine1] = useState<string>("");
+  const [companyAddressLine2, setCompanyAddressLine2] = useState<string>("");
+  const [companyCity, setCompanyCity] = useState<string>("");
+  const [companyRegion, setCompanyRegion] = useState<string>("");
+  const [companyPostalCode, setCompanyPostalCode] = useState<string>("");
+  const [companyCountry, setCompanyCountry] = useState<string>("");
+  const [companyLocationNote, setCompanyLocationNote] = useState<string>("");
+  const [companyRegistryFiles, setCompanyRegistryFiles] = useState<File[]>([]);
   const [companyEmail, setCompanyEmail] = useState<string>("");
   const [companyEmailConfirmed, setCompanyEmailConfirmed] =
     useState<boolean>(false);
@@ -46,6 +62,59 @@ function RegisterPageContent() {
       setError("You must accept the Terms of Service.");
       return;
     }
+    if (accountType === "individual") {
+      if (!fullLegalName.trim()) {
+        setError("Enter your full legal name as shown on your ID.");
+        return;
+      }
+      if (!phone.trim()) {
+        setError("Phone number is required for verification.");
+        return;
+      }
+      if (!shippingLine1.trim() || !shippingCity.trim() || !shippingCountry.trim()) {
+        setError(
+          "Shipping address (street, city, country) is required for delivery verification.",
+        );
+        return;
+      }
+      if (!nationalIdFile) {
+        setError("Upload a photo or scan of your national / government ID.");
+        return;
+      }
+    } else {
+      if (!companyLegalName.trim()) {
+        setError("Company legal name is required.");
+        return;
+      }
+      if (!crNumber.trim()) {
+        setError("Commercial registration (CR) number is required.");
+        return;
+      }
+      if (!companyEmail.trim()) {
+        setError("Official company email is required.");
+        return;
+      }
+      if (
+        !companyAddressLine1.trim() ||
+        !companyCity.trim() ||
+        !companyCountry.trim()
+      ) {
+        setError(
+          "Registered address (street, city, country) is required.",
+        );
+        return;
+      }
+      if (!companyLocationNote.trim()) {
+        setError(
+          "Describe the company location (area, landmark, or map link).",
+        );
+        return;
+      }
+      if (companyRegistryFiles.length === 0) {
+        setError("Upload at least one commercial registry / trade license document.");
+        return;
+      }
+    }
     setPending(true);
     const ok: boolean = await signUpDemo({
       email,
@@ -53,23 +122,58 @@ function RegisterPageContent() {
       accountType,
       hasAcceptedTerms: acceptedTerms,
     });
-    setPending(false);
     if (!ok) {
+      setPending(false);
       setError("Could not create account. Check Supabase configuration.");
       return;
     }
+    const sb = createSupabaseBrowserClient();
+    if (sb) {
+      const { data: authData } = await sb.auth.getUser();
+      if (authData.user) {
+        if (accountType === "individual" && nationalIdFile) {
+          const up = await uploadFraudEvidence(sb, authData.user.id, {
+            file: nationalIdFile,
+            reportFolder: "national-id",
+          });
+          if (!up.ok) {
+            setPending(false);
+            setError(
+              `Account created but ID upload failed: ${up.message}. Try again from support.`,
+            );
+            return;
+          }
+        }
+        if (accountType === "company") {
+          for (const file of companyRegistryFiles) {
+            const up = await uploadFraudEvidence(sb, authData.user.id, {
+              file,
+              reportFolder: "commercial-registry",
+            });
+            if (!up.ok) {
+              setPending(false);
+              setError(
+                `Account created but document upload failed: ${up.message}.`,
+              );
+              return;
+            }
+          }
+        }
+      }
+    }
+    setPending(false);
     setStep("verify");
   }
 
   async function handleIndividualVerify(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    if (otp !== DEMO_OTP) {
-      setError(`Invalid OTP. Demo code: ${DEMO_OTP}`);
+    if (!phone.trim()) {
+      setError("Phone number is missing. Use Back from the account step.");
       return;
     }
-    if (!nationalIdFile) {
-      setError("National ID document is required.");
+    if (otp !== DEMO_OTP) {
+      setError(`Invalid OTP. Demo code: ${DEMO_OTP}`);
       return;
     }
     setPending(true);
@@ -78,21 +182,6 @@ function RegisterPageContent() {
       setPending(false);
       setError("Verification failed. Try signing in again.");
       return;
-    }
-    const sb = createSupabaseBrowserClient();
-    if (sb && nationalIdFile) {
-      const { data: authData } = await sb.auth.getUser();
-      if (authData.user) {
-        const up = await uploadFraudEvidence(sb, authData.user.id, {
-          file: nationalIdFile,
-          reportFolder: "national-id",
-        });
-        if (!up.ok) {
-          setError(
-            `Account verified but ID upload failed: ${up.message}. You can retry from support.`,
-          );
-        }
-      }
     }
     setPending(false);
     router.push("/dashboard");
@@ -131,7 +220,7 @@ function RegisterPageContent() {
   return (
     <div className="min-h-dvh bg-transparent">
       <SiteHeader />
-      <main className="mx-auto max-w-xl px-4 py-10 sm:py-14">
+      <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
         <h1 className="text-2xl font-bold text-slate-50">Create account</h1>
         <p className="mt-2 text-sm text-slate-400">
           Already registered?{" "}
@@ -241,6 +330,273 @@ function RegisterPageContent() {
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
               />
             </div>
+            {accountType === "individual" ? (
+              <div className="space-y-4 border-t border-slate-800 pt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Identity & shipping (verification)
+                </p>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Full legal name (as on ID)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fullLegalName}
+                    onChange={(e) => setFullLegalName(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Phone (for OTP)
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Address line 1
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={shippingLine1}
+                    onChange={(e) => setShippingLine1(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Address line 2 (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingLine2}
+                    onChange={(e) => setShippingLine2(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={shippingCity}
+                      onChange={(e) => setShippingCity(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      State / region
+                    </label>
+                    <input
+                      type="text"
+                      value={shippingRegion}
+                      onChange={(e) => setShippingRegion(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Postal code
+                    </label>
+                    <input
+                      type="text"
+                      value={shippingPostalCode}
+                      onChange={(e) => setShippingPostalCode(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={shippingCountry}
+                      onChange={(e) => setShippingCountry(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    National / government ID (image or PDF)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    required
+                    onChange={(e) =>
+                      setNationalIdFile(e.target.files?.[0] ?? null)
+                    }
+                    className="mt-1 w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-slate-200"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 border-t border-slate-800 pt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Company & registry
+                </p>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Company legal name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={companyLegalName}
+                    onChange={(e) => setCompanyLegalName(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Commercial registration (CR) number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={crNumber}
+                    onChange={(e) => setCrNumber(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Official company email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={companyEmail}
+                    onChange={(e) => setCompanyEmail(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Registered address — line 1
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={companyAddressLine1}
+                    onChange={(e) => setCompanyAddressLine1(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Registered address — line 2 (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={companyAddressLine2}
+                    onChange={(e) => setCompanyAddressLine2(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={companyCity}
+                      onChange={(e) => setCompanyCity(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      State / region
+                    </label>
+                    <input
+                      type="text"
+                      value={companyRegion}
+                      onChange={(e) => setCompanyRegion(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Postal code
+                    </label>
+                    <input
+                      type="text"
+                      value={companyPostalCode}
+                      onChange={(e) => setCompanyPostalCode(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={companyCountry}
+                      onChange={(e) => setCompanyCountry(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Location details (area, landmark, map link, coordinates)
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={companyLocationNote}
+                    onChange={(e) => setCompanyLocationNote(e.target.value)}
+                    className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Commercial registry / trade license (PDF or images, multiple files allowed)
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    required
+                    onChange={(e) =>
+                      setCompanyRegistryFiles(
+                        Array.from(e.target.files ?? []),
+                      )
+                    }
+                    className="mt-1 w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-slate-200"
+                  />
+                  {companyRegistryFiles.length > 0 ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {companyRegistryFiles.length} file(s) selected
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            )}
             {error ? (
               <p className="text-sm text-red-400" role="alert">
                 {error}
@@ -272,22 +628,12 @@ function RegisterPageContent() {
               Individual verification
             </h2>
             <p className="text-xs text-slate-500">
-              Phone OTP (demo use{" "}
-              <code className="text-slate-400">{DEMO_OTP}</code>) and national ID
-              upload. Files go to your private Supabase bucket in production.
+              Enter the SMS code sent to{" "}
+              <span className="font-medium text-slate-300">{phone}</span>. Demo
+              OTP:{" "}
+              <code className="text-slate-400">{DEMO_OTP}</code>. Your ID and
+              shipping details were saved when you created the account.
             </p>
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                Phone number
-              </label>
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
-              />
-            </div>
             <div>
               <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                 OTP
@@ -299,20 +645,6 @@ function RegisterPageContent() {
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                National ID (image/PDF)
-              </label>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                required
-                onChange={(e) =>
-                  setNationalIdFile(e.target.files?.[0] ?? null)
-                }
-                className="mt-1 w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-slate-200"
               />
             </div>
             {error ? (
@@ -336,30 +668,21 @@ function RegisterPageContent() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               Company verification
             </h2>
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                Commercial registry (CR)
-              </label>
-              <input
-                type="text"
-                required
-                value={crNumber}
-                onChange={(e) => setCrNumber(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                Official company email
-              </label>
-              <input
-                type="email"
-                required
-                value={companyEmail}
-                onChange={(e) => setCompanyEmail(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
-              />
-            </div>
+            <p className="text-xs text-slate-500">
+              Registry documents were uploaded with your application. Confirm the
+              official inbox below.
+            </p>
+            <p className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
+              <span className="font-medium text-slate-300">
+                {companyLegalName}
+              </span>
+              <br />
+              CR: {crNumber} · {companyEmail}
+              <br />
+              {companyAddressLine1}
+              {companyAddressLine2 ? `, ${companyAddressLine2}` : ""}, {companyCity},{" "}
+              {companyCountry}
+            </p>
             <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-300">
               <input
                 type="checkbox"
@@ -397,7 +720,7 @@ export default function RegisterPage() {
       fallback={
         <div className="min-h-dvh bg-transparent">
           <SiteHeader />
-          <main className="mx-auto max-w-xl px-4 py-10 sm:py-14">
+          <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
             <div className="h-56 animate-pulse rounded-xl bg-slate-900/80" />
           </main>
         </div>
