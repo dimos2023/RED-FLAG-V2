@@ -1,7 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 const HOLD_TITLE_MS = 2600;
 const GATHER_DURATION_S = 1.55;
@@ -92,6 +98,33 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [requiresTapToPlay, setRequiresTapToPlay] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const attemptIntroPlayback = useCallback(async (): Promise<void> => {
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "true");
+    video.muted = false;
+    video.defaultMuted = false;
+    video.removeAttribute("muted");
+    try {
+      await video.play();
+      setRequiresTapToPlay(false);
+      return;
+    } catch {
+      /* Autoplay with sound is often blocked; fall back to muted then offer tap for audio. */
+    }
+    video.muted = true;
+    video.defaultMuted = true;
+    video.setAttribute("muted", "");
+    try {
+      await video.play();
+      setRequiresTapToPlay(true);
+    } catch {
+      setRequiresTapToPlay(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -138,31 +171,15 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
       return;
     }
     const video = videoRef.current;
-    const attemptPlayback = async (): Promise<void> => {
-      if (!video) {
-        return;
-      }
-      video.muted = true;
-      video.defaultMuted = true;
-      video.setAttribute("muted", "");
-      video.setAttribute("playsinline", "");
-      video.setAttribute("webkit-playsinline", "true");
-      try {
-        await video.play();
-        setRequiresTapToPlay(false);
-      } catch {
-        setRequiresTapToPlay(true);
-      }
-    };
     if (video) {
       video.currentTime = 0;
-      void attemptPlayback();
+      void attemptIntroPlayback();
     }
     const fallbackTimer: number = window.setTimeout(() => {
       setPhase("done");
     }, VIDEO_FALLBACK_MS);
     return () => window.clearTimeout(fallbackTimer);
-  }, [phase]);
+  }, [phase, attemptIntroPlayback]);
 
   async function handleTapToPlay(): Promise<void> {
     const video = videoRef.current;
@@ -171,8 +188,9 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
       return;
     }
     try {
-      video.muted = true;
-      video.defaultMuted = true;
+      video.muted = false;
+      video.defaultMuted = false;
+      video.removeAttribute("muted");
       await video.play();
       setRequiresTapToPlay(false);
     } catch {
@@ -327,7 +345,6 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
                 className="h-full w-full bg-black object-contain md:object-cover"
                 src={VIDEO_SRC}
                 autoPlay
-                muted
                 playsInline
                 controls={false}
                 preload="auto"
@@ -335,9 +352,7 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
                 onError={() => setPhase("done")}
                 onCanPlay={() => {
                   if (phase === "video") {
-                    void videoRef.current?.play().catch(() => {
-                      setRequiresTapToPlay(true);
-                    });
+                    void attemptIntroPlayback();
                   }
                 }}
               />
@@ -350,7 +365,7 @@ export function IntroCurtain({ children }: IntroCurtainProps) {
                     }}
                     className="rounded-xl border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm"
                   >
-                    Tap to start intro video
+                    Tap to play intro with sound
                   </button>
                 </div>
               ) : null}
