@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isAuthDemoEnabled } from "@/lib/supabase/env";
 import {
   hasGoogleIdentity,
   upsertProfileFromGoogleUser,
@@ -37,7 +38,10 @@ type AuthContextValue = {
   /** Supabase-only: becomes true after `/app_admins` lookup completes for the signed-in user */
   isAdminRoleResolved: boolean;
   isHydrated: boolean;
+  /** True only when `NEXT_PUBLIC_AUTH_DEMO=true` (offline mock auth). */
   isDemoMode: boolean;
+  /** True when `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set (from `.env.local` / build env). */
+  hasSupabase: boolean;
   signInDemo: (email: string, password: string) => Promise<SignInResult>;
   signInWithGoogle: () => Promise<SignInResult>;
   signUpDemo: (params: {
@@ -210,7 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileRefreshNonce, setProfileRefreshNonce] = useState<number>(0);
   const googleProfileSyncedForUserIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const isDemoMode: boolean = supabase === null;
+  const isDemoMode: boolean = isAuthDemoEnabled();
+  const hasSupabase: boolean = supabase !== null;
 
   useEffect(() => {
     setUser(readStoredProfile());
@@ -268,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase, syncSessionFromSupabase]);
 
   useEffect(() => {
-    if (isDemoMode || supabase === null) {
+    if (!supabase) {
       setIsAdmin(false);
       setIsAdminRoleResolved(true);
       return;
@@ -296,10 +301,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isDemoMode, supabase, supabaseUser]);
+  }, [supabase, supabaseUser]);
 
   useEffect(() => {
-    if (isDemoMode || !supabase || !supabaseUser) {
+    if (!supabase || !supabaseUser) {
       return;
     }
     let cancelled: boolean = false;
@@ -377,10 +382,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isDemoMode, supabase, supabaseUser, profileRefreshNonce]);
+  }, [supabase, supabaseUser, profileRefreshNonce]);
 
   useEffect(() => {
-    if (isDemoMode || !supabase || !supabaseUser) {
+    if (!supabase || !supabaseUser) {
       return;
     }
     if (!hasGoogleIdentity(supabaseUser)) {
@@ -404,19 +409,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isDemoMode, supabase, supabaseUser]);
+  }, [supabase, supabaseUser]);
 
   const signInWithGoogle = useCallback(async (): Promise<SignInResult> => {
-    if (isDemoMode) {
-      return {
-        ok: false,
-        message: "Google sign-in is not available in offline demo mode.",
-      };
-    }
     if (!supabase) {
       return {
         ok: false,
-        message: "Supabase is not configured (missing env keys).",
+        message:
+          "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local (see .env.example), then restart the dev server.",
       };
     }
     const origin: string =
@@ -438,18 +438,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: true };
     }
     return { ok: false, message: "OAuth URL was not returned by Supabase." };
-  }, [isDemoMode, supabase]);
+  }, [supabase]);
 
   const signInDemo = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
       const normalizedEmail: string = email.trim();
-      if (!isDemoMode) {
-        if (!supabase) {
-          return {
-            ok: false,
-            message: "Supabase is not configured (missing env keys).",
-          };
-        }
+      if (supabase) {
         const { error } = await supabase.auth.signInWithPassword({
           email: normalizedEmail,
           password,
@@ -459,6 +453,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         await syncSessionFromSupabase();
         return { ok: true };
+      }
+      if (!isDemoMode) {
+        return {
+          ok: false,
+          message:
+            "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart the dev server.",
+        };
       }
       const stored: UserProfile | null = readStoredProfile();
       if (!stored || stored.email !== normalizedEmail) {
@@ -490,7 +491,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!params.hasAcceptedTerms) {
         return { ok: false, message: "You must accept the Terms of Service." };
       }
-      if (!isDemoMode && supabase) {
+      if (supabase) {
         const origin: string =
           typeof window !== "undefined" ? window.location.origin : "";
         const { data, error } = await supabase.auth.signUp({
@@ -527,6 +528,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           hasSession,
         };
       }
+      if (!isDemoMode) {
+        return {
+          ok: false,
+          message:
+            "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart the dev server.",
+        };
+      }
       const reg: Partial<UserProfile> = params.registration ?? {};
       const profile: UserProfile = {
         id: `demo-${crypto.randomUUID()}`,
@@ -555,7 +563,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       commercialRegistry?: string;
       companyEmail?: string;
     }): Promise<boolean> => {
-      if (!isDemoMode && supabase) {
+      if (supabase) {
         const { data, error } = await supabase.auth.getUser();
         if (error || !data.user) {
           return false;
@@ -577,6 +585,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         await syncSessionFromSupabase();
         return true;
+      }
+      if (!isDemoMode) {
+        return false;
       }
       let ok: boolean = false;
       setUser((prev) => {
@@ -631,6 +642,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdminRoleResolved,
       isHydrated,
       isDemoMode,
+      hasSupabase,
       signInDemo,
       signInWithGoogle,
       signUpDemo,
@@ -646,6 +658,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdminRoleResolved,
       isHydrated,
       isDemoMode,
+      hasSupabase,
       signInDemo,
       signInWithGoogle,
       signUpDemo,

@@ -29,7 +29,7 @@ function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isArabic } = useLanguage();
-  const { signUpDemo, completeVerificationDemo, user, isHydrated, isDemoMode, signInWithGoogle } =
+  const { signUpDemo, completeVerificationDemo, user, isHydrated, hasSupabase, signInWithGoogle } =
     useAuth();
   const [step, setStep] = useState<Step>("terms");
   const resumeAttemptedRef = useRef<boolean>(false);
@@ -397,7 +397,7 @@ function RegisterPageContent() {
   }
 
   useEffect(() => {
-    if (!isHydrated || isDemoMode) {
+    if (!isHydrated || !hasSupabase) {
       return;
     }
     if (searchParams.get("finish") !== "1") {
@@ -524,7 +524,7 @@ function RegisterPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [isHydrated, isDemoMode, searchParams, router]);
+  }, [isHydrated, hasSupabase, searchParams, router]);
 
   useEffect(() => {
     if (isHydrated && user?.isVerified) {
@@ -634,7 +634,7 @@ function RegisterPageContent() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               Account
             </h2>
-            {!isDemoMode ? (
+            {hasSupabase ? (
               <div className="space-y-3">
                 <p className="text-xs leading-relaxed text-slate-500">
                   {googleCopy.googleHint}

@@ -12,7 +12,7 @@ type AdminShellProps = {
 
 export function AdminShell({ children }: AdminShellProps) {
   const router = useRouter();
-  const { user, isAdmin, isAdminRoleResolved, isHydrated, isDemoMode } =
+  const { user, isAdmin, isAdminRoleResolved, isHydrated, isDemoMode, hasSupabase } =
     useAuth();
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export function AdminShell({ children }: AdminShellProps) {
     if (!isAdminRoleResolved) {
       return;
     }
-    if (isDemoMode || !isAdmin) {
+    if (!hasSupabase || isDemoMode || !isAdmin) {
       router.replace("/admin-login");
     }
   }, [
@@ -35,10 +35,11 @@ export function AdminShell({ children }: AdminShellProps) {
     isAdmin,
     isAdminRoleResolved,
     isDemoMode,
+    hasSupabase,
     router,
   ]);
 
-  if (!isHydrated || !user || isDemoMode || !isAdminRoleResolved || !isAdmin) {
+  if (!isHydrated || !user || !hasSupabase || isDemoMode || !isAdminRoleResolved || !isAdmin) {
     return (
       <div className="min-h-dvh bg-transparent">
         <SiteHeader />
