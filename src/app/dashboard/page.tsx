@@ -15,6 +15,18 @@ export default function DashboardPage() {
         signedInAs: "مسجل باسم",
         fileReport: "تقديم بلاغ",
         openSearch: "فتح البحث",
+        searchGuideTitle: "كيف يعمل البحث وقراءة النتيجة",
+        searchGuideIntro:
+          "يمكنك البحث بعدة طرق حسب الحقول المتاحة في صفحة البحث (مثل الاسم أو المعرف أو غيرها). النتيجة تُعرض بلون وتسمية توضّح ما إذا وُجدت مطابقات.",
+        searchGuideRedLabel: "REDFLAG",
+        searchGuideRedBody:
+          "عندما يكون للبحث نتائج أو معلومات مرتبطة، تظهر كلمة REDFLAG باللون الأحمر كتنبيه.",
+        searchGuideGreenLabel: "GREENFLAG",
+        searchGuideGreenBody:
+          "عندما لا توجد نتائج للبحث، تظهر GREENFLAG باللون الأخضر.",
+        searchGuidePaidTitle: "عرض البيانات التفصيلية والإرسال للبريد",
+        searchGuidePaidBody:
+          "إذا ظهرت نتيجة وترغب في الاطلاع على البيانات التي تثبت ذلك، يتطلب ذلك دفع رسوم عرض البيانات. بعد إتمام الدفع يُرسل المحتوى المعتمد إلى البريد الإلكتروني المسجل على حسابك.",
         cards: [
           {
             title: "خزنة الأدلة",
@@ -35,6 +47,18 @@ export default function DashboardPage() {
         signedInAs: "Signed in as",
         fileReport: "File a report",
         openSearch: "Open search",
+        searchGuideTitle: "How search works and how to read the result",
+        searchGuideIntro:
+          "You can search in several ways using the fields available on the search page (for example name, identifier, or others). The outcome is shown with a label and color that reflect whether anything matched.",
+        searchGuideRedLabel: "REDFLAG",
+        searchGuideRedBody:
+          "When the search returns related information or matches, the word REDFLAG appears in red as a warning.",
+        searchGuideGreenLabel: "GREENFLAG",
+        searchGuideGreenBody:
+          "When there are no results for your search, GREENFLAG appears in green.",
+        searchGuidePaidTitle: "Detailed data and delivery to your email",
+        searchGuidePaidBody:
+          "If you see a result and want the data that backs it up, you pay a fee to unlock the detailed disclosure. After payment, the approved content is sent to the email address registered on your account.",
         cards: [
           {
             title: "Evidence vault",
@@ -81,6 +105,46 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+          <section
+            className="mt-8 rounded-2xl border border-slate-800 bg-slate-950/50 p-6 sm:p-8"
+            aria-labelledby="dashboard-search-guide-heading"
+          >
+            <h2
+              id="dashboard-search-guide-heading"
+              className="text-base font-semibold text-slate-100 sm:text-lg"
+            >
+              {copy.searchGuideTitle}
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-400">
+              {copy.searchGuideIntro}
+            </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-4">
+                <p className="text-lg font-bold tracking-wide text-red-500">
+                  {copy.searchGuideRedLabel}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                  {copy.searchGuideRedBody}
+                </p>
+              </div>
+              <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/15 p-4">
+                <p className="text-lg font-bold tracking-wide text-emerald-400">
+                  {copy.searchGuideGreenLabel}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                  {copy.searchGuideGreenBody}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 rounded-xl border border-amber-900/35 bg-amber-950/20 p-4">
+              <h3 className="text-sm font-semibold text-amber-200">
+                {copy.searchGuidePaidTitle}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                {copy.searchGuidePaidBody}
+              </p>
+            </div>
+          </section>
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
             {copy.cards.map((card) => (
               <div
