@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import { AppProviders } from "@/components/providers";
 
 const geistSans = Geist({
@@ -30,6 +31,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabasePublic = getSupabasePublicEnv();
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
@@ -40,7 +42,7 @@ export default function RootLayout({
           minHeight: "100dvh",
         }}
       >
-        <AppProviders>{children}</AppProviders>
+        <AppProviders supabasePublic={supabasePublic}>{children}</AppProviders>
       </body>
     </html>
   );

@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { setSupabasePublicEnvOverride } from "@/lib/supabase/env";
 import {
   hasGoogleIdentity,
   upsertProfileFromGoogleUser,
@@ -201,7 +202,16 @@ function writeStoredProfile(profile: UserProfile | null): void {
   }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+  supabasePublic,
+}: {
+  children: ReactNode;
+  supabasePublic: { url: string; anonKey: string } | null;
+}) {
+  if (typeof window !== "undefined") {
+    setSupabasePublicEnvOverride(supabasePublic);
+  }
   const [user, setUser] = useState<UserProfile | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);

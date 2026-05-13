@@ -57,11 +57,17 @@ export class ProvidersErrorBoundary extends Component<
   }
 }
 
-export function AppProviders({ children }: { children: ReactNode }) {
+export function AppProviders({
+  children,
+  supabasePublic,
+}: {
+  children: ReactNode;
+  supabasePublic: { url: string; anonKey: string } | null;
+}) {
   return (
     <ProvidersErrorBoundary>
       <LanguageProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider supabasePublic={supabasePublic}>{children}</AuthProvider>
       </LanguageProvider>
     </ProvidersErrorBoundary>
   );

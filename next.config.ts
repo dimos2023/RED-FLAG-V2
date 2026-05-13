@@ -5,15 +5,15 @@ import { getSupabasePublicEnv } from "./src/lib/supabase/env";
 loadEnvConfig(process.cwd());
 
 const supabasePublic = getSupabasePublicEnv();
-const nextPublicEnv: Record<string, string> = supabasePublic
+const nextPublicEnv: Record<string, string> | undefined = supabasePublic
   ? {
       NEXT_PUBLIC_SUPABASE_URL: supabasePublic.url,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: supabasePublic.anonKey,
     }
-  : {};
+  : undefined;
 
 const nextConfig: NextConfig = {
-  env: nextPublicEnv,
+  ...(nextPublicEnv ? { env: nextPublicEnv } : {}),
   reactStrictMode: true,
   allowedDevOrigins: [
     "http://localhost:3000",
