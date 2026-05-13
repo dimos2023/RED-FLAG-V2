@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  clearPendingProfilePayload,
+  filesToPendingPayload,
+  pendingFileToFile,
+  readPendingProfilePayload,
+  writePendingProfilePayload,
+  type PendingProfileFormV1,
+} from "@/lib/register/pending_profile_storage";
 import { uploadFraudEvidence } from "@/lib/supabase/storage";
 import { upsertRegistrationProfile } from "@/lib/supabase/profile_registration";
 import { TERMS_FULL_TEXT, TERMS_VERSION } from "@/lib/terms_of_service";
@@ -13,14 +21,15 @@ import type { AccountType, UserProfile } from "@/types";
 
 const DEMO_OTP = "123456";
 
-type Step = "terms" | "account" | "verify";
+type Step = "terms" | "account" | "awaitEmail" | "verify";
 
 function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signUpDemo, completeVerificationDemo, user, isHydrated } =
+  const { signUpDemo, completeVerificationDemo, user, isHydrated, isDemoMode } =
     useAuth();
   const [step, setStep] = useState<Step>("terms");
+  const resumeAttemptedRef = useRef<boolean>(false);
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [accountType, setAccountType] = useState<AccountType>("individual");
   const [email, setEmail] = useState<string>("");
@@ -50,6 +59,9 @@ function RegisterPageContent() {
     useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(false);
+  const [registerPhase, setRegisterPhase] = useState<
+    "idle" | "auth" | "upload" | "profile"
+  >("idle");
   const gateMessage = useMemo(() => {
     return searchParams.get("reason") === "mandatory-search"
       ? "Mandatory registration required to search or access data."
@@ -117,10 +129,12 @@ function RegisterPageContent() {
       }
     }
     setPending(true);
+    setRegisterPhase("auth");
     const registrationPartial: Partial<UserProfile> =
       accountType === "individual"
         ? {
             phone: phone.trim(),
+            fullName: fullLegalName.trim(),
             fullLegalName: fullLegalName.trim(),
             shippingLine1: shippingLine1.trim(),
             shippingLine2: shippingLine2.trim(),
@@ -130,6 +144,7 @@ function RegisterPageContent() {
             shippingCountry: shippingCountry.trim(),
           }
         : {
+            fullName: companyLegalName.trim(),
             commercialRegistry: crNumber.trim(),
             companyEmail: companyEmail.trim(),
             companyLegalName: companyLegalName.trim(),
@@ -141,63 +156,74 @@ function RegisterPageContent() {
             companyCountry: companyCountry.trim(),
             companyLocationNote: companyLocationNote.trim(),
           };
-    const ok: boolean = await signUpDemo({
+    const signUpResult = await signUpDemo({
       email,
       password,
       accountType,
       hasAcceptedTerms: acceptedTerms,
       registration: registrationPartial,
     });
-    if (!ok) {
+    if (!signUpResult.ok) {
       setPending(false);
-      setError("Could not create account. Check Supabase configuration.");
+      setRegisterPhase("idle");
+      setError(signUpResult.message);
       return;
     }
     const sb = createSupabaseBrowserClient();
-    if (sb) {
+    const signedUpEmail: string = signUpResult.userEmail.trim();
+    const userId: string = signUpResult.userId;
+    if (!userId) {
+      setPending(false);
+      setRegisterPhase("idle");
+      setError("Signup did not return a user id.");
+      return;
+    }
+    if (sb && signUpResult.hasSession) {
+      setRegisterPhase("upload");
       const { data: authData } = await sb.auth.getUser();
-      if (!authData.user) {
-        setPending(false);
-        setError("Session not ready after signup. Try signing in.");
-        return;
+      let activeUserId: string = userId;
+      if (authData.user?.id) {
+        activeUserId = authData.user.id;
       }
-      const userId: string = authData.user.id;
-      let nationalIdStoragePath = "";
-      const commercialPaths: string[] = [];
+      const storagePaths: string[] = [];
       if (accountType === "individual" && nationalIdFile) {
-        const up = await uploadFraudEvidence(sb, userId, {
+        const up = await uploadFraudEvidence(sb, activeUserId, {
           file: nationalIdFile,
           reportFolder: "national-id",
         });
         if (!up.ok) {
           setPending(false);
+          setRegisterPhase("idle");
           setError(
             `Account created but ID upload failed: ${up.message}. Try again from support.`,
           );
           return;
         }
-        nationalIdStoragePath = up.path;
+        storagePaths.push(up.path);
       }
       if (accountType === "company") {
         for (const file of companyRegistryFiles) {
-          const up = await uploadFraudEvidence(sb, userId, {
+          const up = await uploadFraudEvidence(sb, activeUserId, {
             file,
             reportFolder: "commercial-registry",
           });
           if (!up.ok) {
             setPending(false);
+            setRegisterPhase("idle");
             setError(
               `Account created but document upload failed: ${up.message}.`,
             );
             return;
           }
-          commercialPaths.push(up.path);
+          storagePaths.push(up.path);
         }
       }
+      setRegisterPhase("profile");
       const upsertResult =
         accountType === "individual"
           ? await upsertRegistrationProfile(sb, {
-              userId,
+              userId: activeUserId,
+              userEmail: signedUpEmail,
               accountType: "individual",
               phone: phone.trim(),
               fullLegalName: fullLegalName.trim(),
@@ -207,10 +233,11 @@ function RegisterPageContent() {
               shippingRegion: shippingRegion.trim(),
               shippingPostalCode: shippingPostalCode.trim(),
               shippingCountry: shippingCountry.trim(),
-              nationalIdStoragePath,
+              nationalIdStoragePaths: storagePaths,
             })
           : await upsertRegistrationProfile(sb, {
-              userId,
+              userId: activeUserId,
+              userEmail: signedUpEmail,
               accountType: "company",
               commercialRegistry: crNumber.trim(),
               companyEmail: companyEmail.trim(),
@@ -222,14 +249,63 @@ function RegisterPageContent() {
               companyPostalCode: companyPostalCode.trim(),
               companyCountry: companyCountry.trim(),
               companyLocationNote: companyLocationNote.trim(),
-              commercialRegistryStoragePaths: commercialPaths,
+              nationalIdStoragePaths: storagePaths,
             });
       if (!upsertResult.ok) {
         setPending(false);
+        setRegisterPhase("idle");
         setError(`Could not save registration data: ${upsertResult.message}`);
         return;
       }
+    } else if (sb && !signUpResult.hasSession) {
+      const fileList: File[] =
+        accountType === "individual"
+          ? nationalIdFile
+            ? [nationalIdFile]
+            : []
+          : companyRegistryFiles;
+      const encoded = await filesToPendingPayload(fileList);
+      if (!encoded.ok) {
+        setPending(false);
+        setRegisterPhase("idle");
+        setError(encoded.message);
+        return;
+      }
+      const pendingForm: PendingProfileFormV1 = {
+        version: 1,
+        userId,
+        userEmail: signedUpEmail,
+        accountType,
+        phone: phone.trim(),
+        fullLegalName: fullLegalName.trim(),
+        shippingLine1: shippingLine1.trim(),
+        shippingLine2: shippingLine2.trim(),
+        shippingCity: shippingCity.trim(),
+        shippingRegion: shippingRegion.trim(),
+        shippingPostalCode: shippingPostalCode.trim(),
+        shippingCountry: shippingCountry.trim(),
+        companyLegalName: companyLegalName.trim(),
+        crNumber: crNumber.trim(),
+        companyEmail: companyEmail.trim(),
+        companyAddressLine1: companyAddressLine1.trim(),
+        companyAddressLine2: companyAddressLine2.trim(),
+        companyCity: companyCity.trim(),
+        companyRegion: companyRegion.trim(),
+        companyPostalCode: companyPostalCode.trim(),
+        companyCountry: companyCountry.trim(),
+        companyLocationNote: companyLocationNote.trim(),
+      };
+      writePendingProfilePayload({
+        version: 1,
+        form: pendingForm,
+        files: encoded.list,
+      });
+      setRegisterPhase("idle");
+      setPending(false);
+      setStep("awaitEmail");
+      return;
     }
+    setRegisterPhase("idle");
     setPending(false);
     setStep("verify");
   }
@@ -283,6 +359,136 @@ function RegisterPageContent() {
     }
     router.push("/dashboard");
   }
+
+  useEffect(() => {
+    if (!isHydrated || isDemoMode) {
+      return;
+    }
+    if (searchParams.get("finish") !== "1") {
+      return;
+    }
+    if (resumeAttemptedRef.current) {
+      return;
+    }
+    const sb = createSupabaseBrowserClient();
+    if (!sb) {
+      return;
+    }
+    let cancelled = false;
+    void (async (): Promise<void> => {
+      const { data } = await sb.auth.getUser();
+      const uid: string | undefined = data.user?.id;
+      if (!uid) {
+        void router.replace("/register");
+        return;
+      }
+      const pending = readPendingProfilePayload();
+      if (!pending || pending.form.userId !== uid) {
+        void router.replace("/register");
+        return;
+      }
+      resumeAttemptedRef.current = true;
+      setRegisterPhase("upload");
+      setError("");
+      const paths: string[] = [];
+      const files = pending.files.map(pendingFileToFile);
+      const folder: string =
+        pending.form.accountType === "company"
+          ? "commercial-registry"
+          : "national-id";
+      for (const file of files) {
+        if (cancelled) {
+          return;
+        }
+        const up = await uploadFraudEvidence(sb, uid, {
+          file,
+          reportFolder: folder,
+        });
+        if (!up.ok) {
+          if (!cancelled) {
+            setError(up.message);
+            setRegisterPhase("idle");
+            resumeAttemptedRef.current = false;
+          }
+          return;
+        }
+        paths.push(up.path);
+      }
+      if (cancelled) {
+        return;
+      }
+      setRegisterPhase("profile");
+      const f = pending.form;
+      const upsertResult =
+        f.accountType === "individual"
+          ? await upsertRegistrationProfile(sb, {
+              userId: uid,
+              userEmail: f.userEmail.trim(),
+              accountType: "individual",
+              phone: f.phone.trim(),
+              fullLegalName: f.fullLegalName.trim(),
+              shippingLine1: f.shippingLine1.trim(),
+              shippingLine2: f.shippingLine2.trim(),
+              shippingCity: f.shippingCity.trim(),
+              shippingRegion: f.shippingRegion.trim(),
+              shippingPostalCode: f.shippingPostalCode.trim(),
+              shippingCountry: f.shippingCountry.trim(),
+              nationalIdStoragePaths: paths,
+            })
+          : await upsertRegistrationProfile(sb, {
+              userId: uid,
+              userEmail: f.userEmail.trim(),
+              accountType: "company",
+              commercialRegistry: f.crNumber.trim(),
+              companyEmail: f.companyEmail.trim(),
+              companyLegalName: f.companyLegalName.trim(),
+              companyAddressLine1: f.companyAddressLine1.trim(),
+              companyAddressLine2: f.companyAddressLine2.trim(),
+              companyCity: f.companyCity.trim(),
+              companyRegion: f.companyRegion.trim(),
+              companyPostalCode: f.companyPostalCode.trim(),
+              companyCountry: f.companyCountry.trim(),
+              companyLocationNote: f.companyLocationNote.trim(),
+              nationalIdStoragePaths: paths,
+            });
+      if (cancelled) {
+        return;
+      }
+      if (!upsertResult.ok) {
+        setError(upsertResult.message);
+        setRegisterPhase("idle");
+        resumeAttemptedRef.current = false;
+        return;
+      }
+      clearPendingProfilePayload();
+      setPhone(f.phone.trim());
+      setFullLegalName(f.fullLegalName.trim());
+      setShippingLine1(f.shippingLine1.trim());
+      setShippingLine2(f.shippingLine2.trim());
+      setShippingCity(f.shippingCity.trim());
+      setShippingRegion(f.shippingRegion.trim());
+      setShippingPostalCode(f.shippingPostalCode.trim());
+      setShippingCountry(f.shippingCountry.trim());
+      setCompanyLegalName(f.companyLegalName.trim());
+      setCrNumber(f.crNumber.trim());
+      setCompanyEmail(f.companyEmail.trim());
+      setCompanyAddressLine1(f.companyAddressLine1.trim());
+      setCompanyAddressLine2(f.companyAddressLine2.trim());
+      setCompanyCity(f.companyCity.trim());
+      setCompanyRegion(f.companyRegion.trim());
+      setCompanyPostalCode(f.companyPostalCode.trim());
+      setCompanyCountry(f.companyCountry.trim());
+      setCompanyLocationNote(f.companyLocationNote.trim());
+      setAccountType(f.accountType);
+      setEmail(f.userEmail.trim());
+      setRegisterPhase("idle");
+      setStep("verify");
+      void router.replace("/register");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isHydrated, isDemoMode, searchParams, router]);
 
   useEffect(() => {
     if (isHydrated && user?.isVerified) {
@@ -345,6 +551,36 @@ function RegisterPageContent() {
             >
               Continue
             </button>
+          </section>
+        ) : step === "awaitEmail" ? (
+          <section className="mt-8 space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Confirm your email
+            </h2>
+            <p className="text-sm text-slate-300">
+              Your account was created. Open the confirmation link we sent to{" "}
+              <span className="font-medium text-slate-100">{email}</span>. After
+              you confirm, you will be brought back here to upload files to
+              storage and save your profile automatically.
+            </p>
+            <p className="text-xs text-slate-500">
+              If you already confirmed, wait a moment or refresh this page. You
+              can also open the link from your inbox again.
+            </p>
+            {registerPhase !== "idle" ? (
+              <p className="text-xs text-slate-400" aria-live="polite">
+                {registerPhase === "upload"
+                  ? "Uploading documents…"
+                  : registerPhase === "profile"
+                    ? "Saving profile…"
+                    : "Working…"}
+              </p>
+            ) : null}
+            {error ? (
+              <p className="text-sm text-red-400" role="alert">
+                {error}
+              </p>
+            ) : null}
           </section>
         ) : step === "account" ? (
           <form
@@ -675,6 +911,15 @@ function RegisterPageContent() {
                 {error}
               </p>
             ) : null}
+            {pending && registerPhase !== "idle" ? (
+              <p className="text-xs text-slate-500" aria-live="polite">
+                {registerPhase === "auth"
+                  ? "Creating your account (auth)…"
+                  : registerPhase === "upload"
+                    ? "Uploading documents…"
+                    : "Saving your profile to the database…"}
+              </p>
+            ) : null}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -688,7 +933,15 @@ function RegisterPageContent() {
                 disabled={pending}
                 className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-60"
               >
-                {pending ? "Creating…" : "Create & verify"}
+                {pending
+                  ? registerPhase === "auth"
+                    ? "Creating account…"
+                    : registerPhase === "upload"
+                      ? "Uploading…"
+                      : registerPhase === "profile"
+                        ? "Saving profile…"
+                        : "Working…"
+                  : "Create & verify"}
               </button>
             </div>
           </form>

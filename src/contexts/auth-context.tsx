@@ -21,6 +21,10 @@ export type SignInResult =
   | { ok: true }
   | { ok: false; message: string };
 
+export type SignUpDemoResult =
+  | { ok: true; userId: string; userEmail: string; hasSession: boolean }
+  | { ok: false; message: string };
+
 type AuthContextValue = {
   user: UserProfile | null;
   supabaseUser: User | null;
@@ -36,7 +40,7 @@ type AuthContextValue = {
     accountType: AccountType;
     hasAcceptedTerms: boolean;
     registration?: Partial<UserProfile>;
-  }) => Promise<boolean>;
+  }) => Promise<SignUpDemoResult>;
   completeVerificationDemo: (params: {
     accountType: AccountType;
     phone?: string;
@@ -49,12 +53,10 @@ type AuthContextValue = {
 };
 
 type ProfileRow = {
-  account_type: "individual" | "company" | null;
-  terms_version: string | null;
-  phone: string | null;
-  commercial_registry: string | null;
-  company_email: string | null;
+  email: string | null;
   is_verified: boolean | null;
+  full_name: string | null;
+  updated_at: string | null;
   full_legal_name: string | null;
   shipping_line1: string | null;
   shipping_line2: string | null;
@@ -70,9 +72,69 @@ type ProfileRow = {
   company_postal_code: string | null;
   company_country: string | null;
   company_location_note: string | null;
-  national_id_storage_path: string | null;
-  commercial_registry_storage_paths: string[] | null;
+  national_id_storage_path: string[] | string | null;
 };
+
+function parsePrefixedLine(
+  text: string | null | undefined,
+  label: string,
+): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  const escaped: string = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re: RegExp = new RegExp(`^${escaped}\\s*(.+)$`, "m");
+  const m: RegExpExecArray | null = re.exec(text);
+  return m?.[1]?.trim();
+}
+
+function stripCompanyRegistrationPrefixes(
+  note: string | null,
+): string | undefined {
+  if (!note) {
+    return undefined;
+  }
+  const without: string = note
+    .replace(/^CR:\s*.+$/m, "")
+    .replace(/^Official company email:\s*.+$/m, "")
+    .replace(/^\n+/, "")
+    .trim();
+  return without.length > 0 ? without : undefined;
+}
+
+function pathsFromNationalIdField(
+  raw: string | null,
+): { single?: string; list?: string[] } {
+  if (!raw || raw.trim() === "") {
+    return {};
+  }
+  if (raw.includes("|")) {
+    const list: string[] = raw
+      .split("|")
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0);
+    return { list };
+  }
+  return { single: raw.trim() };
+}
+
+function normalizeNationalPaths(
+  value: string | string[] | null | undefined,
+): string[] {
+  if (value == null) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.filter(
+      (p: unknown): p is string => typeof p === "string" && p.trim().length > 0,
+    );
+  }
+  if (typeof value === "string") {
+    return pathsFromNationalIdField(value).list ??
+      (value.trim() ? [value.trim()] : []);
+  }
+  return [];
+}
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -236,7 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase
       .from("profiles")
       .select(
-        "account_type, terms_version, phone, commercial_registry, company_email, is_verified, full_legal_name, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path, commercial_registry_storage_paths",
+        "email, is_verified, full_name, updated_at, full_legal_name, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path",
       )
       .eq("id", supabaseUser.id)
       .maybeSingle()
@@ -248,27 +310,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser((prev) => {
           const fallback: UserProfile =
             prev ?? buildProfileFromAuthUser(supabaseUser);
-          const paths: string[] | undefined =
-            Array.isArray(row.commercial_registry_storage_paths)
-              ? row.commercial_registry_storage_paths
-              : undefined;
+          const note: string | null = row.company_location_note;
+          const crParsed: string | undefined = parsePrefixedLine(note, "CR:");
+          const emailParsed: string | undefined = parsePrefixedLine(
+            note,
+            "Official company email:",
+          );
+          const normPaths: string[] = normalizeNationalPaths(
+            row.national_id_storage_path,
+          );
+          const isCompanyRow: boolean = Boolean(row.company_legal_name?.trim());
           const next: UserProfile = {
             ...fallback,
-            accountType:
-              row.account_type === "company" || row.account_type === "individual"
-                ? row.account_type
-                : fallback.accountType,
-            hasAcceptedTerms: row.terms_version
-              ? row.terms_version === TERMS_VERSION
-              : fallback.hasAcceptedTerms,
             isVerified:
               typeof row.is_verified === "boolean"
                 ? row.is_verified
                 : fallback.isVerified,
-            phone: row.phone ?? fallback.phone,
-            commercialRegistry:
-              row.commercial_registry ?? fallback.commercialRegistry,
-            companyEmail: row.company_email ?? fallback.companyEmail,
+            email: row.email?.trim() || fallback.email,
+            fullName: row.full_name ?? fallback.fullName,
             fullLegalName: row.full_legal_name ?? fallback.fullLegalName,
             shippingLine1: row.shipping_line1 ?? fallback.shippingLine1,
             shippingLine2: row.shipping_line2 ?? fallback.shippingLine2,
@@ -289,11 +348,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               row.company_postal_code ?? fallback.companyPostalCode,
             companyCountry: row.company_country ?? fallback.companyCountry,
             companyLocationNote:
-              row.company_location_note ?? fallback.companyLocationNote,
+              stripCompanyRegistrationPrefixes(note) ??
+              fallback.companyLocationNote,
+            commercialRegistry: crParsed ?? fallback.commercialRegistry,
+            companyEmail: emailParsed ?? fallback.companyEmail,
+            nationalIdStoragePaths:
+              normPaths.length > 0 ? normPaths : fallback.nationalIdStoragePaths,
             nationalIdStoragePath:
-              row.national_id_storage_path ?? fallback.nationalIdStoragePath,
-            commercialRegistryStoragePaths:
-              paths ?? fallback.commercialRegistryStoragePaths,
+              normPaths[0] ?? fallback.nationalIdStoragePath,
+            commercialRegistryStoragePaths: isCompanyRow
+              ? normPaths.length > 0
+                ? normPaths
+                : fallback.commercialRegistryStoragePaths
+              : fallback.commercialRegistryStoragePaths,
           };
           writeStoredProfile(next);
           return next;
@@ -350,19 +417,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountType: AccountType;
       hasAcceptedTerms: boolean;
       registration?: Partial<UserProfile>;
-    }): Promise<boolean> => {
+    }): Promise<SignUpDemoResult> => {
       if (!params.hasAcceptedTerms) {
-        return false;
+        return { ok: false, message: "You must accept the Terms of Service." };
       }
       if (!isDemoMode && supabase) {
         const origin: string =
           typeof window !== "undefined" ? window.location.origin : "";
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: params.email,
           password: params.password,
           options: {
             emailRedirectTo: origin
-              ? `${origin}/auth/callback?next=${encodeURIComponent("/register")}`
+              ? `${origin}/auth/callback?next=${encodeURIComponent("/register?finish=1")}`
               : undefined,
             data: {
               account_type: params.accountType,
@@ -371,7 +438,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
           },
         });
-        return !error;
+        if (error) {
+          return { ok: false, message: error.message };
+        }
+        const newUser = data.user;
+        if (!newUser?.id) {
+          return {
+            ok: false,
+            message:
+              "Signup did not return a user id. If email confirmation is enabled, confirm your email then sign in to finish registration.",
+          };
+        }
+        const hasSession: boolean = Boolean(data.session);
+        await syncSessionFromSupabase();
+        return {
+          ok: true,
+          userId: newUser.id,
+          userEmail: newUser.email ?? params.email.trim(),
+          hasSession,
+        };
       }
       const reg: Partial<UserProfile> = params.registration ?? {};
       const profile: UserProfile = {
@@ -384,9 +469,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       setUser(profile);
       writeStoredProfile(profile);
-      return true;
+      return {
+        ok: true,
+        userId: profile.id,
+        userEmail: params.email.trim(),
+        hasSession: true,
+      };
     },
-    [isDemoMode, supabase],
+    [isDemoMode, supabase, syncSessionFromSupabase],
   );
 
   const completeVerificationDemo = useCallback(
@@ -401,12 +491,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error || !data.user) {
           return false;
         }
-        const verified = await markProfileVerified(supabase, data.user.id, {
-          phone: params.phone,
-          commercialRegistry: params.commercialRegistry,
-          companyEmail: params.companyEmail,
-          accountType: params.accountType,
-        });
+        const verified = await markProfileVerified(supabase, data.user.id);
         if (!verified.ok) {
           return false;
         }

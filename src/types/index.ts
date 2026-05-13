@@ -23,6 +23,7 @@ export type UserProfile = {
   accountType: AccountType;
   hasAcceptedTerms: boolean;
   isVerified: boolean;
+  fullName?: string;
   phone?: string;
   commercialRegistry?: string;
   companyEmail?: string;
@@ -42,5 +43,6 @@ export type UserProfile = {
   companyCountry?: string;
   companyLocationNote?: string;
   nationalIdStoragePath?: string;
+  nationalIdStoragePaths?: string[];
   commercialRegistryStoragePaths?: string[];
 };

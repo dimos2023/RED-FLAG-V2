@@ -4,14 +4,13 @@
 create extension if not exists "pgcrypto";
 
 -- Link to auth.users
+-- Profile row: id = auth.users.id. No password column (credentials live in auth.users only).
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
-  account_type text not null check (account_type in ('individual', 'company')),
-  terms_version text not null,
-  phone text,
-  commercial_registry text,
-  company_email text,
-  is_verified boolean not null default false,
+  email text,
+  is_verified boolean default false,
+  full_name text,
+  updated_at timestamptz,
   full_legal_name text,
   shipping_line1 text,
   shipping_line2 text,
@@ -27,8 +26,7 @@ create table if not exists public.profiles (
   company_postal_code text,
   company_country text,
   company_location_note text,
-  national_id_storage_path text,
-  commercial_registry_storage_paths text[],
+  national_id_storage_path text[],
   created_at timestamptz not null default now()
 );
 
