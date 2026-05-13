@@ -21,15 +21,13 @@ import { upsertRegistrationProfile } from "@/lib/supabase/profile_registration";
 import { TERMS_FULL_TEXT, TERMS_VERSION } from "@/lib/terms_of_service";
 import type { AccountType, UserProfile } from "@/types";
 
-const DEMO_OTP = "123456";
-
 type Step = "terms" | "account" | "awaitEmail" | "verify";
 
 function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isArabic } = useLanguage();
-  const { signUpDemo, completeVerificationDemo, user, isHydrated, hasSupabase, signInWithGoogle } =
+  const { signUp, completeVerification, user, isHydrated, hasSupabase, signInWithGoogle } =
     useAuth();
   const [step, setStep] = useState<Step>("terms");
   const resumeAttemptedRef = useRef<boolean>(false);
@@ -38,7 +36,8 @@ function RegisterPageContent() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
-  const [otp, setOtp] = useState<string>("");
+  const [individualIdentityConfirmed, setIndividualIdentityConfirmed] =
+    useState<boolean>(false);
   const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
   const [fullLegalName, setFullLegalName] = useState<string>("");
   const [shippingLine1, setShippingLine1] = useState<string>("");
@@ -192,7 +191,7 @@ function RegisterPageContent() {
             companyCountry: companyCountry.trim(),
             companyLocationNote: companyLocationNote.trim(),
           };
-    const signUpResult = await signUpDemo({
+    const signUpResult = await signUp({
       email,
       password,
       accountType,
@@ -353,12 +352,14 @@ function RegisterPageContent() {
       setError("Phone number is missing. Use Back from the account step.");
       return;
     }
-    if (otp !== DEMO_OTP) {
-      setError(`Invalid OTP. Demo code: ${DEMO_OTP}`);
+    if (!individualIdentityConfirmed) {
+      setError(
+        "Confirm that your phone number and identity details are correct before completing verification.",
+      );
       return;
     }
     setPending(true);
-    const verified: boolean = await completeVerificationDemo({
+    const verified: boolean = await completeVerification({
       accountType: "individual",
       phone,
     });
@@ -383,7 +384,7 @@ function RegisterPageContent() {
       return;
     }
     setPending(true);
-    const verified: boolean = await completeVerificationDemo({
+    const verified: boolean = await completeVerification({
       accountType: "company",
       commercialRegistry: crNumber,
       companyEmail,
@@ -732,7 +733,7 @@ function RegisterPageContent() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Phone (for OTP)
+                    Phone
                   </label>
                   <input
                     type="tel"
@@ -1028,25 +1029,24 @@ function RegisterPageContent() {
               Individual verification
             </h2>
             <p className="text-xs text-slate-500">
-              Enter the SMS code sent to{" "}
-              <span className="font-medium text-slate-300">{phone}</span>. Demo
-              OTP:{" "}
-              <code className="text-slate-400">{DEMO_OTP}</code>. Your ID and
-              shipping details were saved when you created the account.
+              Your ID and shipping details were saved when you created the account.
+              Phone on file:{" "}
+              <span className="font-medium text-slate-300">{phone}</span>. Confirm
+              below to mark your profile as verified in the registry.
             </p>
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                OTP
-              </label>
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-300">
               <input
-                type="text"
-                inputMode="numeric"
-                required
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                type="checkbox"
+                checked={individualIdentityConfirmed}
+                onChange={(e) => setIndividualIdentityConfirmed(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border border-slate-600 bg-slate-900 text-red-600"
               />
-            </div>
+              <span>
+                I confirm the phone number and identity information I provided are
+                accurate. I understand false information may result in account
+                closure and legal consequences.
+              </span>
+            </label>
             {error ? (
               <p className="text-sm text-red-400" role="alert">
                 {error}
@@ -1054,7 +1054,7 @@ function RegisterPageContent() {
             ) : null}
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || !individualIdentityConfirmed}
               className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-60"
             >
               {pending ? "Saving…" : "Complete verification"}
@@ -1092,7 +1092,7 @@ function RegisterPageContent() {
               />
               <span>
                 I confirm we control this inbox and have completed email
-                verification (link simulated in demo).
+                verification using the confirmation link sent to that address.
               </span>
             </label>
             {error ? (

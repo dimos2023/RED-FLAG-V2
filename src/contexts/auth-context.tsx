@@ -12,7 +12,6 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { isAuthDemoEnabled } from "@/lib/supabase/env";
 import {
   hasGoogleIdentity,
   upsertProfileFromGoogleUser,
@@ -27,7 +26,7 @@ export type SignInResult =
   | { ok: true }
   | { ok: false; message: string };
 
-export type SignUpDemoResult =
+export type SignUpResult =
   | { ok: true; userId: string; userEmail: string; hasSession: boolean }
   | { ok: false; message: string };
 
@@ -38,20 +37,18 @@ type AuthContextValue = {
   /** Supabase-only: becomes true after `/app_admins` lookup completes for the signed-in user */
   isAdminRoleResolved: boolean;
   isHydrated: boolean;
-  /** True only when `NEXT_PUBLIC_AUTH_DEMO=true` (offline mock auth). */
-  isDemoMode: boolean;
-  /** True when `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set (from `.env.local` / build env). */
+  /** True when `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set (from env / Vercel). */
   hasSupabase: boolean;
-  signInDemo: (email: string, password: string) => Promise<SignInResult>;
+  signInWithPassword: (email: string, password: string) => Promise<SignInResult>;
   signInWithGoogle: () => Promise<SignInResult>;
-  signUpDemo: (params: {
+  signUp: (params: {
     email: string;
     password: string;
     accountType: AccountType;
     hasAcceptedTerms: boolean;
     registration?: Partial<UserProfile>;
-  }) => Promise<SignUpDemoResult>;
-  completeVerificationDemo: (params: {
+  }) => Promise<SignUpResult>;
+  completeVerification: (params: {
     accountType: AccountType;
     phone?: string;
     commercialRegistry?: string;
@@ -214,7 +211,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileRefreshNonce, setProfileRefreshNonce] = useState<number>(0);
   const googleProfileSyncedForUserIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const isDemoMode: boolean = isAuthDemoEnabled();
   const hasSupabase: boolean = supabase !== null;
 
   useEffect(() => {
@@ -416,7 +412,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return {
         ok: false,
         message:
-          "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local (see .env.example), then restart the dev server.",
+          "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local or your deployment environment (e.g. Vercel), then redeploy or restart the dev server.",
       };
     }
     const origin: string =
@@ -440,175 +436,119 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: false, message: "OAuth URL was not returned by Supabase." };
   }, [supabase]);
 
-  const signInDemo = useCallback(
+  const signInWithPassword = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
       const normalizedEmail: string = email.trim();
-      if (supabase) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        });
-        if (error) {
-          return { ok: false, message: error.message };
-        }
-        await syncSessionFromSupabase();
-        return { ok: true };
-      }
-      if (!isDemoMode) {
+      if (!supabase) {
         return {
           ok: false,
           message:
-            "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart the dev server.",
+            "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local (local) or in your host project settings (e.g. Vercel → Environment Variables), then redeploy or restart the dev server.",
         };
       }
-      const stored: UserProfile | null = readStoredProfile();
-      if (!stored || stored.email !== normalizedEmail) {
-        return {
-          ok: false,
-          message: "Invalid credentials or account not found.",
-        };
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+      if (error) {
+        return { ok: false, message: error.message };
       }
-      if (password.length < 6) {
-        return {
-          ok: false,
-          message: "Invalid credentials or account not found.",
-        };
-      }
-      setUser(stored);
+      await syncSessionFromSupabase();
       return { ok: true };
     },
-    [isDemoMode, supabase, syncSessionFromSupabase],
+    [supabase, syncSessionFromSupabase],
   );
 
-  const signUpDemo = useCallback(
+  const signUp = useCallback(
     async (params: {
       email: string;
       password: string;
       accountType: AccountType;
       hasAcceptedTerms: boolean;
       registration?: Partial<UserProfile>;
-    }): Promise<SignUpDemoResult> => {
+    }): Promise<SignUpResult> => {
       if (!params.hasAcceptedTerms) {
         return { ok: false, message: "You must accept the Terms of Service." };
       }
-      if (supabase) {
-        const origin: string =
-          typeof window !== "undefined" ? window.location.origin : "";
-        const { data, error } = await supabase.auth.signUp({
-          email: params.email,
-          password: params.password,
-          options: {
-            emailRedirectTo: origin
-              ? `${origin}/auth/callback?next=${encodeURIComponent("/register?finish=1")}`
-              : undefined,
-            data: {
-              account_type: params.accountType,
-              terms_version: TERMS_VERSION,
-              is_verified: false,
-            },
-          },
-        });
-        if (error) {
-          return { ok: false, message: error.message };
-        }
-        const newUser = data.user;
-        if (!newUser?.id) {
-          return {
-            ok: false,
-            message:
-              "Signup did not return a user id. If email confirmation is enabled, confirm your email then sign in to finish registration.",
-          };
-        }
-        const hasSession: boolean = Boolean(data.session);
-        await syncSessionFromSupabase();
-        return {
-          ok: true,
-          userId: newUser.id,
-          userEmail: newUser.email ?? params.email.trim(),
-          hasSession,
-        };
-      }
-      if (!isDemoMode) {
+      if (!supabase) {
         return {
           ok: false,
           message:
-            "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart the dev server.",
+            "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local or your deployment environment, then redeploy.",
         };
       }
-      const reg: Partial<UserProfile> = params.registration ?? {};
-      const profile: UserProfile = {
-        id: `demo-${crypto.randomUUID()}`,
+      const origin: string =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const { data, error } = await supabase.auth.signUp({
         email: params.email,
-        accountType: params.accountType,
-        hasAcceptedTerms: true,
-        isVerified: false,
-        ...reg,
-      };
-      setUser(profile);
-      writeStoredProfile(profile);
+        password: params.password,
+        options: {
+          emailRedirectTo: origin
+            ? `${origin}/auth/callback?next=${encodeURIComponent("/register?finish=1")}`
+            : undefined,
+          data: {
+            account_type: params.accountType,
+            terms_version: TERMS_VERSION,
+            is_verified: false,
+          },
+        },
+      });
+      if (error) {
+        return { ok: false, message: error.message };
+      }
+      const newUser = data.user;
+      if (!newUser?.id) {
+        return {
+          ok: false,
+          message:
+            "Signup did not return a user id. If email confirmation is enabled, confirm your email then sign in to finish registration.",
+        };
+      }
+      const hasSession: boolean = Boolean(data.session);
+      await syncSessionFromSupabase();
       return {
         ok: true,
-        userId: profile.id,
-        userEmail: params.email.trim(),
-        hasSession: true,
+        userId: newUser.id,
+        userEmail: newUser.email ?? params.email.trim(),
+        hasSession,
       };
     },
-    [isDemoMode, supabase, syncSessionFromSupabase],
+    [supabase, syncSessionFromSupabase],
   );
 
-  const completeVerificationDemo = useCallback(
+  const completeVerification = useCallback(
     async (params: {
       accountType: AccountType;
       phone?: string;
       commercialRegistry?: string;
       companyEmail?: string;
     }): Promise<boolean> => {
-      if (supabase) {
-        const { data, error } = await supabase.auth.getUser();
-        if (error || !data.user) {
-          return false;
-        }
-        const verified = await markProfileVerified(supabase, data.user.id);
-        if (!verified.ok) {
-          return false;
-        }
-        const { error: updateError } = await supabase.auth.updateUser({
-          data: {
-            is_verified: true,
-            phone: params.phone,
-            commercial_registry: params.commercialRegistry,
-            company_email: params.companyEmail,
-          },
-        });
-        if (updateError) {
-          return false;
-        }
-        await syncSessionFromSupabase();
-        return true;
-      }
-      if (!isDemoMode) {
+      if (!supabase) {
         return false;
       }
-      let ok: boolean = false;
-      setUser((prev) => {
-        if (!prev) {
-          return prev;
-        }
-        ok = true;
-        const next: UserProfile = {
-          ...prev,
-          isVerified: true,
-          phone: params.phone ?? prev.phone,
-          commercialRegistry:
-            params.commercialRegistry ?? prev.commercialRegistry,
-          companyEmail: params.companyEmail ?? prev.companyEmail,
-        };
-        writeStoredProfile(next);
-        return next;
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        return false;
+      }
+      const verified = await markProfileVerified(supabase, data.user.id);
+      if (!verified.ok) {
+        return false;
+      }
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: {
+          is_verified: true,
+          phone: params.phone,
+          commercial_registry: params.commercialRegistry,
+          company_email: params.companyEmail,
+        },
       });
-      return ok;
+      if (updateError) {
+        return false;
+      }
+      await syncSessionFromSupabase();
+      return true;
     },
-    [isDemoMode, supabase, syncSessionFromSupabase],
+    [supabase, syncSessionFromSupabase],
   );
 
   const signOut = useCallback(() => {
@@ -641,12 +581,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isAdminRoleResolved,
       isHydrated,
-      isDemoMode,
       hasSupabase,
-      signInDemo,
+      signInWithPassword,
       signInWithGoogle,
-      signUpDemo,
-      completeVerificationDemo,
+      signUp,
+      completeVerification,
       signOut,
       updateProfile,
       refreshSessionFromSupabase: syncSessionFromSupabase,
@@ -657,12 +596,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isAdminRoleResolved,
       isHydrated,
-      isDemoMode,
       hasSupabase,
-      signInDemo,
+      signInWithPassword,
       signInWithGoogle,
-      signUpDemo,
-      completeVerificationDemo,
+      signUp,
+      completeVerification,
       signOut,
       updateProfile,
       syncSessionFromSupabase,

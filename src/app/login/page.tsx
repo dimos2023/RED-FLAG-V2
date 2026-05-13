@@ -19,7 +19,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signInDemo, signInWithGoogle, isHydrated } = useAuth();
+  const { signInWithPassword, signInWithGoogle, isHydrated } = useAuth();
   const { isArabic } = useLanguage();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -76,7 +76,7 @@ function LoginPageContent() {
     e.preventDefault();
     setError("");
     setPending(true);
-    const signInResult = await signInDemo(email, password);
+    const signInResult = await signInWithPassword(email, password);
     if (!signInResult.ok) {
       setPending(false);
       setError(formatSignInError(isArabic, signInResult.message));

@@ -26,6 +26,6 @@ export async function POST(request: Request) {
     ok: true,
     checkoutUrl: undefined as string | undefined,
     note:
-      "Demo mode: connect STRIPE_SECRET_KEY and create a Checkout Session that unlocks signed evidence URLs after payment.",
+      "Stripe is not configured: set STRIPE_SECRET_KEY on the server and create a Checkout Session that unlocks signed evidence URLs after payment.",
   });
 }
