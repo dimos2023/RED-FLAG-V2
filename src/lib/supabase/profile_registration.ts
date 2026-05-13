@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AccountType } from "@/types";
 
 const nowIso: () => string = (): string => new Date().toISOString();
 

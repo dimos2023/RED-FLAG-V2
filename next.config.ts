@@ -1,6 +1,19 @@
+import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
+import { getSupabasePublicEnv } from "./src/lib/supabase/env";
+
+loadEnvConfig(process.cwd());
+
+const supabasePublic = getSupabasePublicEnv();
+const nextPublicEnv: Record<string, string> = supabasePublic
+  ? {
+      NEXT_PUBLIC_SUPABASE_URL: supabasePublic.url,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabasePublic.anonKey,
+    }
+  : {};
 
 const nextConfig: NextConfig = {
+  env: nextPublicEnv,
   reactStrictMode: true,
   allowedDevOrigins: [
     "http://localhost:3000",
