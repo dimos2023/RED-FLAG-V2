@@ -41,7 +41,7 @@ type AuthContextValue = {
   /** True when `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set (from env / Vercel). */
   hasSupabase: boolean;
   signInWithPassword: (email: string, password: string) => Promise<SignInResult>;
-  signInWithGoogle: () => Promise<SignInResult>;
+  signInWithGoogle: (options?: { nextPath?: string }) => Promise<SignInResult>;
   signUp: (params: {
     email: string;
     password: string;
@@ -417,34 +417,41 @@ export function AuthProvider({
     };
   }, [supabase, supabaseUser]);
 
-  const signInWithGoogle = useCallback(async (): Promise<SignInResult> => {
-    if (!supabase) {
-      return {
-        ok: false,
-        message:
-          "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local or your deployment environment (e.g. Vercel), then redeploy or restart the dev server.",
-      };
-    }
-    const origin: string =
-      typeof window !== "undefined" ? window.location.origin : "";
-    if (!origin) {
-      return { ok: false, message: "Could not resolve app origin for OAuth." };
-    }
-    const nextPath: string = "/auth/post-oauth";
-    const redirectTo: string = `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-    if (error) {
-      return { ok: false, message: error.message };
-    }
-    if (data.url) {
-      window.location.assign(data.url);
-      return { ok: true };
-    }
-    return { ok: false, message: "OAuth URL was not returned by Supabase." };
-  }, [supabase]);
+  const signInWithGoogle = useCallback(
+    async (options?: { nextPath?: string }): Promise<SignInResult> => {
+      if (!supabase) {
+        return {
+          ok: false,
+          message:
+            "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local or your deployment environment (e.g. Vercel), then redeploy or restart the dev server.",
+        };
+      }
+      const origin: string =
+        typeof window !== "undefined" ? window.location.origin : "";
+      if (!origin) {
+        return { ok: false, message: "Could not resolve app origin for OAuth." };
+      }
+      const nextPath: string =
+        options?.nextPath?.trim() !== undefined &&
+        options.nextPath.trim().length > 0
+          ? options.nextPath.trim()
+          : "/auth/post-oauth";
+      const redirectTo: string = `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+      if (error) {
+        return { ok: false, message: error.message };
+      }
+      if (data.url) {
+        window.location.assign(data.url);
+        return { ok: true };
+      }
+      return { ok: false, message: "OAuth URL was not returned by Supabase." };
+    },
+    [supabase],
+  );
 
   const signInWithPassword = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
