@@ -3,12 +3,31 @@
 import { useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { VerifiedGate } from "@/components/verified-gate";
+import { useLanguage } from "@/contexts/language-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { uploadFraudEvidence } from "@/lib/supabase/storage";
 
 type ReportStep = 1 | 2 | 3;
 
 export default function ReportPage() {
+  const { isArabic } = useLanguage();
+  const flowCopy = isArabic
+    ? {
+        title: "معالج بلاغ الاحتيال",
+        intro:
+          "خطوات جمع البيانات. ملفات الأدلة للخزنة الخاصة فقط ولا تُعرض على أي واجهة عامة.",
+        storageTitle: "ماذا يحدث بعد الإرسال؟",
+        storageBody:
+          "يُحفظ الموضوع (الاسم، الهاتف، السجل التجاري، العنوان/الملاحظات) في جدول التقارير في قاعدة البيانات، وتُسجَّل ملفات الأدلة في جدول منفصل مع مسارات التخزين. يظهر البلاغ تلقائيًا في لوحة الإدارة (طابور المراجعة) بحالة «قيد الانتظار» حتى يوافق المسؤول أو يرفض. لا يظهر البلاغ في صفحة البحث العامة إلا بعد الموافقة.",
+      }
+    : {
+        title: "Fraud report wizard",
+        intro:
+          "Multi-step intake. Evidence files are for the private vault only and must never be shown on public surfaces.",
+        storageTitle: "What happens after you submit?",
+        storageBody:
+          "Subject fields (name, phone, commercial registry, address/notes) are stored in the reports table; evidence files are recorded with storage paths. The report appears in the admin report queue as pending until an administrator approves or rejects it. Public search only returns reports after approval.",
+      };
   const [step, setStep] = useState<ReportStep>(1);
   const [subjectName, setSubjectName] = useState<string>("");
   const [subjectPhone, setSubjectPhone] = useState<string>("");
@@ -138,12 +157,22 @@ export default function ReportPage() {
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
         <VerifiedGate>
           <h1 className="text-2xl font-bold text-slate-50">
-            Fraud report wizard
+            {flowCopy.title}
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
-            Multi-step intake. Evidence files are for the private vault only and
-            must never be shown on public surfaces.
-          </p>
+          <p className="mt-2 text-sm text-slate-400">{flowCopy.intro}</p>
+          <div
+            className="mt-4 rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-sm leading-relaxed text-slate-400"
+            role="region"
+            aria-labelledby="report-flow-heading"
+          >
+            <h2
+              id="report-flow-heading"
+              className="text-xs font-semibold uppercase tracking-wide text-slate-300"
+            >
+              {flowCopy.storageTitle}
+            </h2>
+            <p className="mt-2">{flowCopy.storageBody}</p>
+          </div>
           <div className="mt-6 flex gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
             <span className={step >= 1 ? "text-red-400" : ""}>1 Subject</span>
             <span>/</span>

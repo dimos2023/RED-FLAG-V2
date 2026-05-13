@@ -10,6 +10,7 @@ import {
   type FormEvent,
 } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 import { formatSignInError } from "@/lib/format_sign_in_error";
@@ -18,16 +19,28 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signInDemo, isHydrated } = useAuth();
+  const { signInDemo, signInWithGoogle, isHydrated } = useAuth();
   const { isArabic } = useLanguage();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [googleError, setGoogleError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(false);
   const gateMessage = useMemo(() => {
     return searchParams.get("reason") === "mandatory-search"
       ? "Mandatory registration required to search or access data."
       : "";
+  }, [searchParams]);
+  const oauthError = useMemo(() => {
+    const raw: string | null = searchParams.get("error");
+    if (!raw) {
+      return "";
+    }
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
   }, [searchParams]);
   const copy = isArabic
     ? {
@@ -39,6 +52,10 @@ function LoginPageContent() {
         submitting: "جاري الدخول…",
         submit: "دخول",
         invalid: "بيانات الدخول غير صحيحة أو الحساب غير موجود.",
+        divider: "أو",
+        google: "المتابعة بحساب Google",
+        googlePending: "جاري التوجيه…",
+        googleFail: "تعذر بدء تسجيل الدخول بـ Google.",
       }
     : {
         title: "Sign in",
@@ -49,6 +66,10 @@ function LoginPageContent() {
         submitting: "Signing in…",
         submit: "Sign in",
         invalid: "Invalid credentials or account not found.",
+        divider: "or",
+        google: "Continue with Google",
+        googlePending: "Redirecting…",
+        googleFail: "Could not start Google sign-in.",
       };
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -102,6 +123,11 @@ function LoginPageContent() {
             {gateMessage}
           </p>
         ) : null}
+        {oauthError ? (
+          <p className="mt-3 rounded-lg border border-red-900/50 bg-red-950/25 px-3 py-2 text-sm text-red-300" role="alert">
+            {oauthError}
+          </p>
+        ) : null}
         {!isHydrated ? (
           <div className="mt-8 h-40 animate-pulse rounded-xl bg-slate-900" />
         ) : (
@@ -109,6 +135,29 @@ function LoginPageContent() {
             onSubmit={handleSubmit}
             className="mt-8 space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6"
           >
+            <GoogleSignInButton
+              label={copy.google}
+              pendingLabel={copy.googlePending}
+              disabled={pending}
+              onPress={async () => {
+                setGoogleError("");
+                setError("");
+                const result = await signInWithGoogle();
+                if (!result.ok) {
+                  setGoogleError(result.message || copy.googleFail);
+                }
+              }}
+            />
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center" aria-hidden>
+                <div className="w-full border-t border-slate-800" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                <span className="bg-slate-900/90 px-3 text-slate-500">
+                  {copy.divider}
+                </span>
+              </div>
+            </div>
             <div>
               <label
                 htmlFor="email"
@@ -147,6 +196,11 @@ function LoginPageContent() {
             {error ? (
               <p className="text-sm text-red-400" role="alert">
                 {error}
+              </p>
+            ) : null}
+            {googleError ? (
+              <p className="text-sm text-red-400" role="alert">
+                {googleError}
               </p>
             ) : null}
             <button

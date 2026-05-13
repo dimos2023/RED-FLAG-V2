@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     `subject_name.ilike.%${query}%`,
     `subject_cr.ilike.%${query}%`,
     `subject_phone.ilike.%${query}%`,
+    `subject_address.ilike.%${query}%`,
     `logo_storage_path.ilike.%${query}%`,
   ].join(",");
 

@@ -6,11 +6,16 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  hasGoogleIdentity,
+  upsertProfileFromGoogleUser,
+} from "@/lib/supabase/google_profile_sync";
 import { markProfileVerified } from "@/lib/supabase/profile_registration";
 import type { AccountType, UserProfile } from "@/types";
 import { TERMS_VERSION } from "@/lib/terms_of_service";
@@ -34,6 +39,7 @@ type AuthContextValue = {
   isHydrated: boolean;
   isDemoMode: boolean;
   signInDemo: (email: string, password: string) => Promise<SignInResult>;
+  signInWithGoogle: () => Promise<SignInResult>;
   signUpDemo: (params: {
     email: string;
     password: string;
@@ -201,6 +207,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdminRoleResolved, setIsAdminRoleResolved] =
     useState<boolean>(false);
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
+  const [profileRefreshNonce, setProfileRefreshNonce] = useState<number>(0);
+  const googleProfileSyncedForUserIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const isDemoMode: boolean = supabase === null;
 
@@ -369,7 +377,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, [isDemoMode, supabase, supabaseUser, profileRefreshNonce]);
+
+  useEffect(() => {
+    if (isDemoMode || !supabase || !supabaseUser) {
+      return;
+    }
+    if (!hasGoogleIdentity(supabaseUser)) {
+      return;
+    }
+    if (googleProfileSyncedForUserIdRef.current === supabaseUser.id) {
+      return;
+    }
+    googleProfileSyncedForUserIdRef.current = supabaseUser.id;
+    let cancelled: boolean = false;
+    void upsertProfileFromGoogleUser(supabase, supabaseUser).then((result) => {
+      if (cancelled) {
+        return;
+      }
+      if (!result.ok) {
+        googleProfileSyncedForUserIdRef.current = null;
+        return;
+      }
+      setProfileRefreshNonce((n: number) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isDemoMode, supabase, supabaseUser]);
+
+  const signInWithGoogle = useCallback(async (): Promise<SignInResult> => {
+    if (isDemoMode) {
+      return {
+        ok: false,
+        message: "Google sign-in is not available in offline demo mode.",
+      };
+    }
+    if (!supabase) {
+      return {
+        ok: false,
+        message: "Supabase is not configured (missing env keys).",
+      };
+    }
+    const origin: string =
+      typeof window !== "undefined" ? window.location.origin : "";
+    if (!origin) {
+      return { ok: false, message: "Could not resolve app origin for OAuth." };
+    }
+    const nextPath: string = "/auth/post-oauth";
+    const redirectTo: string = `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+    if (data.url) {
+      window.location.assign(data.url);
+      return { ok: true };
+    }
+    return { ok: false, message: "OAuth URL was not returned by Supabase." };
+  }, [isDemoMode, supabase]);
 
   const signInDemo = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
@@ -535,6 +604,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (supabase) {
       void supabase.auth.signOut();
     }
+    googleProfileSyncedForUserIdRef.current = null;
     setUser(null);
     setSupabaseUser(null);
     setIsAdmin(false);
@@ -562,6 +632,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isHydrated,
       isDemoMode,
       signInDemo,
+      signInWithGoogle,
       signUpDemo,
       completeVerificationDemo,
       signOut,
@@ -576,6 +647,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isHydrated,
       isDemoMode,
       signInDemo,
+      signInWithGoogle,
       signUpDemo,
       completeVerificationDemo,
       signOut,

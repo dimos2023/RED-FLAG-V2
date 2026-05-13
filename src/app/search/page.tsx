@@ -36,8 +36,8 @@ function SearchPageContent() {
     ? {
         title: "بحث السجل",
         subtitle:
-          "يتم عرض بيانات غير حساسة فقط. الأدلة تبقى خاصة حتى إتمام الوصول المدفوع.",
-        placeholder: "ابحث باسم الكيان أو رقم السجل أو رقم الهاتف.",
+          "يتم عرض بيانات غير حساسة فقط. الأدلة تبقى خاصة حتى إتمام الوصول المدفوع. يظهر في النتائج فقط ما وافق عليه المسؤول من لوحة الإدارة.",
+        placeholder: "ابحث باسم الكيان أو رقم السجل أو رقم الهاتف أو نص من العنوان/الملاحظات.",
         searching: "جاري البحث…",
         search: "بحث",
         minChars: "يرجى إدخال حرفين على الأقل.",
@@ -54,8 +54,8 @@ function SearchPageContent() {
     : {
         title: "Registry search",
         subtitle:
-          "Results show non-sensitive metadata only. Evidence remains in a private vault until purchased.",
-        placeholder: "Search by Entity Name, Registration Number, or Phone.",
+          "Results show non-sensitive metadata only. Evidence remains in a private vault until purchased. Only administrator-approved reports appear here (pending reports stay in the admin queue until reviewed).",
+        placeholder: "Search by entity name, registration number, phone, or text from address/notes.",
         searching: "Searching…",
         search: "Search",
         minChars: "Please enter at least 2 characters.",

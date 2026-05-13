@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { useAuth } from "@/contexts/auth-context";
+import { useLanguage } from "@/contexts/language-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   clearPendingProfilePayload,
@@ -26,7 +28,8 @@ type Step = "terms" | "account" | "awaitEmail" | "verify";
 function RegisterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signUpDemo, completeVerificationDemo, user, isHydrated, isDemoMode } =
+  const { isArabic } = useLanguage();
+  const { signUpDemo, completeVerificationDemo, user, isHydrated, isDemoMode, signInWithGoogle } =
     useAuth();
   const [step, setStep] = useState<Step>("terms");
   const resumeAttemptedRef = useRef<boolean>(false);
@@ -67,6 +70,39 @@ function RegisterPageContent() {
       ? "Mandatory registration required to search or access data."
       : "";
   }, [searchParams]);
+  const oauthUrlError = useMemo(() => {
+    const raw: string | null = searchParams.get("error");
+    if (!raw) {
+      return "";
+    }
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }, [searchParams]);
+  const googleCopy = useMemo(
+    () =>
+      isArabic
+        ? {
+            divider: "أو",
+            google: "التسجيل بواسطة Google",
+            googlePending: "جاري التوجيه…",
+            googleFail: "تعذر بدء تسجيل الدخول بـ Google.",
+            googleHint:
+              "بعد الدخول بـ Google أكمل التحقق من الهوية من هذه الصفحة إن لزم.",
+          }
+        : {
+            divider: "or",
+            google: "Continue with Google",
+            googlePending: "Redirecting…",
+            googleFail: "Could not start Google sign-in.",
+            googleHint:
+              "After Google sign-in, complete identity verification on this page if required.",
+          },
+    [isArabic],
+  );
+  const [googleOAuthError, setGoogleOAuthError] = useState<string>("");
 
   async function handleAccountSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -512,6 +548,14 @@ function RegisterPageContent() {
             {gateMessage}
           </p>
         ) : null}
+        {oauthUrlError || googleOAuthError ? (
+          <p
+            className="mt-3 rounded-lg border border-red-900/50 bg-red-950/25 px-3 py-2 text-sm text-red-300"
+            role="alert"
+          >
+            {oauthUrlError || googleOAuthError}
+          </p>
+        ) : null}
         {!isHydrated ? (
           <div className="mt-8 h-96 animate-pulse rounded-2xl bg-slate-900" />
         ) : step === "terms" ? (
@@ -590,6 +634,36 @@ function RegisterPageContent() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               Account
             </h2>
+            {!isDemoMode ? (
+              <div className="space-y-3">
+                <p className="text-xs leading-relaxed text-slate-500">
+                  {googleCopy.googleHint}
+                </p>
+                <GoogleSignInButton
+                  label={googleCopy.google}
+                  pendingLabel={googleCopy.googlePending}
+                  disabled={pending}
+                  onPress={async () => {
+                    setGoogleOAuthError("");
+                    setError("");
+                    const result = await signInWithGoogle();
+                    if (!result.ok) {
+                      setGoogleOAuthError(result.message || googleCopy.googleFail);
+                    }
+                  }}
+                />
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center" aria-hidden>
+                    <div className="w-full border-t border-slate-800" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                    <span className="bg-slate-900/90 px-3 text-slate-500">
+                      {googleCopy.divider}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
