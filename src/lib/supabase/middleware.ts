@@ -29,7 +29,32 @@ export async function updateSession(
         },
       },
     });
-    await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const path: string = request.nextUrl.pathname;
+    if (
+      user?.email &&
+      !path.startsWith("/site-blocked") &&
+      !path.startsWith("/_next")
+    ) {
+      const normalized: string = user.email.trim().toLowerCase();
+      const { data: strikeRow } = await supabase
+        .from("admin_intruder_strikes")
+        .select("permanently_blocked_at")
+        .eq("email_normalized", normalized)
+        .maybeSingle();
+      if (strikeRow?.permanently_blocked_at) {
+        await supabase.auth.signOut();
+        const redirect: NextResponse = NextResponse.redirect(
+          new URL("/site-blocked?reason=admin_permanent", request.url),
+        );
+        response.cookies.getAll().forEach((cookie) => {
+          redirect.cookies.set(cookie.name, cookie.value);
+        });
+        return redirect;
+      }
+    }
   } catch {
     /* Invalid env or transient Supabase client error — do not fail the request */
   }

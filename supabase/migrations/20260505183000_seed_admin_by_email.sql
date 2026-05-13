@@ -4,6 +4,6 @@
 insert into public.app_admins (user_id)
 select id
 from auth.users
-where email = 'quantumnetwork1000@gmail.com'
+where email = 'ahmedashry.hh@gmail.com'
 on conflict (user_id) do nothing;
 

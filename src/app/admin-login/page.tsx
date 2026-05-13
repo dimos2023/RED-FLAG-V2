@@ -1,22 +1,29 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
+import { AdminAccessDeniedModal } from "@/components/admin-access-denied-modal";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
-import { ADMIN_OAUTH_FORBIDDEN_MESSAGE_AR } from "@/lib/admin_oauth_gate";
 
 function AdminLoginContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { signInWithGoogle, hasSupabase, isHydrated } = useAuth();
   const { isArabic } = useLanguage();
   const [googleError, setGoogleError] = useState<string>("");
   const reason: string | null = searchParams.get("reason");
+  const showForbiddenModal: boolean = reason === "forbidden";
   const queryError: string = useMemo(() => {
     if (reason === "forbidden") {
-      return ADMIN_OAUTH_FORBIDDEN_MESSAGE_AR;
+      return "";
+    }
+    if (reason === "no_admin_role") {
+      return isArabic
+        ? "البريد مصرح به لكن حسابك غير مضاف كمسؤول في النظام. راجع إعداد قاعدة البيانات."
+        : "This email is allowed but your user is not listed in app_admins. Update the database.";
     }
     if (reason === "session") {
       return isArabic
@@ -35,7 +42,7 @@ function AdminLoginContent() {
       ? {
           title: "دخول الإدارة",
           subtitle:
-            "الدخول إلى لوحة الإدارة متاح فقط عبر حساب Google المصرّح به.",
+            "الدخول إلى لوحة الإدارة متاح فقط للبريد ahmedashry.hh@gmail.com عبر Google.",
           google: "المتابعة بحساب Google",
           googlePending: "جاري التوجيه…",
           googleFail: "تعذر بدء تسجيل الدخول بـ Google.",
@@ -44,7 +51,7 @@ function AdminLoginContent() {
       : {
           title: "Admin login",
           subtitle:
-            "Admin access is available only through the authorized Google account.",
+            "Admin access is only for ahmedashry.hh@gmail.com via Google.",
           google: "Continue with Google",
           googlePending: "Redirecting…",
           googleFail: "Could not start Google sign-in.",
@@ -63,6 +70,9 @@ function AdminLoginContent() {
     if (!result.ok) {
       setGoogleError(result.message);
     }
+  }
+  function handleCloseForbiddenModal(): void {
+    router.replace("/admin-login");
   }
   return (
     <div className="min-h-dvh bg-transparent">
@@ -89,6 +99,11 @@ function AdminLoginContent() {
           />
         </div>
       </main>
+      <AdminAccessDeniedModal
+        open={showForbiddenModal}
+        isArabic={isArabic}
+        onClose={handleCloseForbiddenModal}
+      />
     </div>
   );
 }

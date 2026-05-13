@@ -4,12 +4,36 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
+import { isAdminOAuthEmailAllowed } from "@/lib/admin_oauth_gate";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { isAdminOAuthIdentityAllowed } from "@/lib/admin_oauth_gate";
+
+type RpcStrikePayload = {
+  strike_count?: unknown;
+  permanently_blocked?: unknown;
+};
+
+function readStrikeRpcPayload(raw: unknown): {
+  strikeCount: number;
+  permanentlyBlocked: boolean;
+} {
+  if (raw === null || typeof raw !== "object") {
+    return { strikeCount: 0, permanentlyBlocked: false };
+  }
+  const o: RpcStrikePayload = raw as RpcStrikePayload;
+  const strikeRaw: unknown = o.strike_count;
+  const strikeCount: number =
+    typeof strikeRaw === "number" && Number.isFinite(strikeRaw)
+      ? strikeRaw
+      : 0;
+  return {
+    strikeCount,
+    permanentlyBlocked: Boolean(o.permanently_blocked),
+  };
+}
 
 export default function PostAdminOAuthPage() {
   const router = useRouter();
-  const { supabaseUser, isHydrated, refreshSessionFromSupabase } = useAuth();
+  const { isHydrated, refreshSessionFromSupabase } = useAuth();
   const [status, setStatus] = useState<string>(
     "جاري التحقق من صلاحيات الإدارة…",
   );
@@ -17,24 +41,24 @@ export default function PostAdminOAuthPage() {
     if (!isHydrated) {
       return;
     }
-    if (!supabaseUser) {
-      setStatus("جاري تحميل الجلسة…");
-      return;
-    }
     let cancelled: boolean = false;
     void (async (): Promise<void> => {
-      const sb = createSupabaseBrowserClient();
-      if (!sb) {
-        if (!cancelled) {
-          await refreshSessionFromSupabase();
-          router.replace("/admin-login?reason=config");
-        }
-        return;
-      }
+      setStatus("جاري تحميل الجلسة…");
       await refreshSessionFromSupabase();
       if (cancelled) {
         return;
       }
+      const sb = createSupabaseBrowserClient();
+      if (!sb) {
+        if (!cancelled) {
+          router.replace("/admin-login?reason=config");
+        }
+        return;
+      }
+      if (cancelled) {
+        return;
+      }
+      setStatus("جاري التحقق من صلاحيات الإدارة…");
       const { data, error } = await sb.auth.getUser();
       const user = data.user;
       if (error || !user) {
@@ -43,12 +67,19 @@ export default function PostAdminOAuthPage() {
         }
         return;
       }
-      if (!isAdminOAuthIdentityAllowed(user.id, user.email)) {
+      if (!isAdminOAuthEmailAllowed(user.email)) {
+        const { data: rpcRaw } = await sb.rpc("record_admin_unauthorized_attempt");
+        const { permanentlyBlocked } = readStrikeRpcPayload(rpcRaw);
         await sb.auth.signOut();
         await refreshSessionFromSupabase();
-        if (!cancelled) {
-          router.replace("/admin-login?reason=forbidden");
+        if (cancelled) {
+          return;
         }
+        if (permanentlyBlocked) {
+          window.location.assign("/site-blocked?reason=admin_permanent");
+          return;
+        }
+        router.replace("/admin-login?reason=forbidden");
         return;
       }
       const { data: adminRow, error: adminErr } = await sb
@@ -60,7 +91,7 @@ export default function PostAdminOAuthPage() {
         await sb.auth.signOut();
         await refreshSessionFromSupabase();
         if (!cancelled) {
-          router.replace("/admin-login?reason=forbidden");
+          router.replace("/admin-login?reason=no_admin_role");
         }
         return;
       }
@@ -71,7 +102,7 @@ export default function PostAdminOAuthPage() {
     return () => {
       cancelled = true;
     };
-  }, [isHydrated, supabaseUser, router, refreshSessionFromSupabase]);
+  }, [isHydrated, router, refreshSessionFromSupabase]);
   return (
     <div className="min-h-dvh bg-transparent">
       <SiteHeader />
