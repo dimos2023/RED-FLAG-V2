@@ -2,6 +2,8 @@ export type AccountType = "individual" | "company";
 
 export type ReportReviewStatus = "pending" | "approved" | "rejected";
 
+export type ProfileVerificationStatus = "pending" | "verified" | "rejected";
+
 export type FraudReportRow = {
   id: string;
   owner_id: string;
@@ -23,6 +25,7 @@ export type UserProfile = {
   accountType: AccountType;
   hasAcceptedTerms: boolean;
   isVerified: boolean;
+  verificationStatus?: ProfileVerificationStatus;
   fullName?: string;
   phone?: string;
   commercialRegistry?: string;

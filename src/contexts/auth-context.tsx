@@ -63,9 +63,11 @@ type AuthContextValue = {
 type ProfileRow = {
   email: string | null;
   is_verified: boolean | null;
+  verification_status: string | null;
   full_name: string | null;
   updated_at: string | null;
   full_legal_name: string | null;
+  phone: string | null;
   shipping_line1: string | null;
   shipping_line2: string | null;
   shipping_city: string | null;
@@ -142,6 +144,17 @@ function normalizeNationalPaths(
       (value.trim() ? [value.trim()] : []);
   }
   return [];
+}
+
+function resolveVerificationStatus(row: ProfileRow): "pending" | "verified" | "rejected" {
+  const raw: string | undefined = row.verification_status?.trim().toLowerCase();
+  if (raw === "verified" || raw === "pending" || raw === "rejected") {
+    return raw;
+  }
+  if (row.is_verified === true) {
+    return "verified";
+  }
+  return "pending";
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -316,9 +329,10 @@ export function AuthProvider({
     }
     let cancelled: boolean = false;
     void supabase
+      .schema("public")
       .from("profiles")
       .select(
-        "email, is_verified, full_name, updated_at, full_legal_name, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path",
+        "email, is_verified, verification_status, full_name, updated_at, full_legal_name, phone, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path",
       )
       .eq("id", supabaseUser.id)
       .maybeSingle()
@@ -342,13 +356,12 @@ export function AuthProvider({
           const isCompanyRow: boolean = Boolean(row.company_legal_name?.trim());
           const next: UserProfile = {
             ...fallback,
-            isVerified:
-              typeof row.is_verified === "boolean"
-                ? row.is_verified
-                : fallback.isVerified,
+            isVerified: resolveVerificationStatus(row) === "verified",
+            verificationStatus: resolveVerificationStatus(row),
             email: row.email?.trim() || fallback.email,
             fullName: row.full_name ?? fallback.fullName,
             fullLegalName: row.full_legal_name ?? fallback.fullLegalName,
+            phone: row.phone?.trim() || fallback.phone,
             shippingLine1: row.shipping_line1 ?? fallback.shippingLine1,
             shippingLine2: row.shipping_line2 ?? fallback.shippingLine2,
             shippingCity: row.shipping_city ?? fallback.shippingCity,
@@ -564,6 +577,7 @@ export function AuthProvider({
         return false;
       }
       await syncSessionFromSupabase();
+      setProfileRefreshNonce((n: number) => n + 1);
       return true;
     },
     [supabase, syncSessionFromSupabase],

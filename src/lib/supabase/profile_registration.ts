@@ -68,8 +68,11 @@ export async function upsertRegistrationProfile(
       company_country: null,
       company_location_note: null,
       national_id_storage_path: paths.length > 0 ? paths : null,
+      phone: input.phone.trim(),
+      verification_status: "pending",
     };
     const { error } = await supabase
+      .schema("public")
       .from("profiles")
       .upsert(row, { onConflict: "id" });
     if (error) {
@@ -105,8 +108,11 @@ export async function upsertRegistrationProfile(
     company_country: input.companyCountry.trim(),
     company_location_note: companyNote,
     national_id_storage_path: paths.length > 0 ? paths : null,
+    phone: null,
+    verification_status: "pending",
   };
   const { error } = await supabase
+    .schema("public")
     .from("profiles")
     .upsert(row, { onConflict: "id" });
   if (error) {
@@ -120,9 +126,11 @@ export async function markProfileVerified(
   userId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { error } = await supabase
+    .schema("public")
     .from("profiles")
     .update({
       is_verified: true,
+      verification_status: "verified",
       updated_at: nowIso(),
     })
     .eq("id", userId);

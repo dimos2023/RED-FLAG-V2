@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { userProfileAllowsVerifiedAccess } from "@/lib/profile_completeness";
 
 type VerifiedGateProps = {
   children: ReactNode;
@@ -50,21 +51,22 @@ export function VerifiedGate({ children }: VerifiedGateProps) {
       </div>
     );
   }
-  if (!user.isVerified && !isAdmin) {
+  if (!userProfileAllowsVerifiedAccess(user) && !isAdmin) {
     return (
       <div className="mx-auto max-w-lg rounded-2xl border border-amber-900/50 bg-amber-950/20 p-8 text-center">
         <h2 className="text-lg font-semibold text-amber-200">
           Verification required
         </h2>
         <p className="mt-2 text-sm text-amber-100/70">
-          Complete phone / ID or company verification before using search and
-          reporting features.
+          Your account must be in the <strong>verified</strong> state before you
+          can use search and reporting. Complete registration or wait for
+          review if you already submitted documents.
         </p>
         <Link
-          href="/register"
+          href="/complete-registration"
           className="mt-6 inline-block rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-black hover:bg-amber-500"
         >
-          Continue verification
+          Complete registration
         </Link>
       </div>
     );

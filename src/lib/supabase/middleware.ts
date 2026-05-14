@@ -1,6 +1,13 @@
+/**
+ * Supabase session refresh + security routing.
+ * Calls `profileSessionGate` for `public.profiles` (ID upload + `verification_status`).
+ */
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
+import { profileSessionGate } from "@/lib/supabase/profile_session_gate";
+
+export { profileSessionGate } from "@/lib/supabase/profile_session_gate";
 
 export async function updateSession(
   request: NextRequest,
@@ -40,6 +47,7 @@ export async function updateSession(
     ) {
       const normalized: string = user.email.trim().toLowerCase();
       const { data: strikeRow } = await supabase
+        .schema("public")
         .from("admin_intruder_strikes")
         .select("permanently_blocked_at")
         .eq("email_normalized", normalized)
@@ -53,6 +61,17 @@ export async function updateSession(
           redirect.cookies.set(cookie.name, cookie.value);
         });
         return redirect;
+      }
+    }
+    if (user) {
+      const gated: NextResponse | null = await profileSessionGate(
+        request,
+        response,
+        supabase,
+        user,
+      );
+      if (gated) {
+        return gated;
       }
     }
   } catch {

@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { PageTransitionShell } from "@/components/page-transition/page_transition_shell";
 import { AuthProvider } from "@/contexts/auth-context";
 import { LanguageProvider } from "@/contexts/language-context";
 
@@ -67,7 +68,9 @@ export function AppProviders({
   return (
     <ProvidersErrorBoundary>
       <LanguageProvider>
-        <AuthProvider supabasePublic={supabasePublic}>{children}</AuthProvider>
+        <AuthProvider supabasePublic={supabasePublic}>
+          <PageTransitionShell>{children}</PageTransitionShell>
+        </AuthProvider>
       </LanguageProvider>
     </ProvidersErrorBoundary>
   );

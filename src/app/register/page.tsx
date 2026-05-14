@@ -16,8 +16,10 @@ import {
   writePendingProfilePayload,
   type PendingProfileFormV1,
 } from "@/lib/register/pending_profile_storage";
+import { requestNationalIdOcrGate } from "@/lib/register/ocr_gate";
 import { uploadFraudEvidence } from "@/lib/supabase/storage";
 import { upsertRegistrationProfile } from "@/lib/supabase/profile_registration";
+import { resolveGoogleDisplayName } from "@/lib/supabase/google_profile_sync";
 import { TERMS_FULL_TEXT, TERMS_VERSION } from "@/lib/terms_of_service";
 import type { AccountType, UserProfile } from "@/types";
 
@@ -219,6 +221,35 @@ function RegisterPageContent() {
       let activeUserId: string = userId;
       if (authData.user?.id) {
         activeUserId = authData.user.id;
+      }
+      const googleDisplayName: string | null = authData.user
+        ? resolveGoogleDisplayName(authData.user)
+        : null;
+      if (accountType === "individual" && nationalIdFile) {
+        const gate = await requestNationalIdOcrGate({
+          file: nationalIdFile,
+          expectedLegalName: fullLegalName.trim(),
+          googleDisplayName,
+        });
+        if (!gate.ok) {
+          setPending(false);
+          setRegisterPhase("idle");
+          setError(gate.message);
+          return;
+        }
+      }
+      if (accountType === "company" && companyRegistryFiles.length > 0) {
+        const gate = await requestNationalIdOcrGate({
+          file: companyRegistryFiles[0],
+          expectedLegalName: companyLegalName.trim(),
+          googleDisplayName,
+        });
+        if (!gate.ok) {
+          setPending(false);
+          setRegisterPhase("idle");
+          setError(gate.message);
+          return;
+        }
       }
       const storagePaths: string[] = [];
       if (accountType === "individual" && nationalIdFile) {
@@ -429,6 +460,40 @@ function RegisterPageContent() {
       setError("");
       const paths: string[] = [];
       const files = pending.files.map(pendingFileToFile);
+      const f0 = pending.form;
+      const googleDisplayName: string | null = data.user
+        ? resolveGoogleDisplayName(data.user)
+        : null;
+      if (f0.accountType === "individual" && files.length > 0) {
+        const gate = await requestNationalIdOcrGate({
+          file: files[0],
+          expectedLegalName: f0.fullLegalName.trim(),
+          googleDisplayName,
+        });
+        if (!gate.ok) {
+          if (!cancelled) {
+            setError(gate.message);
+            setRegisterPhase("idle");
+            resumeAttemptedRef.current = false;
+          }
+          return;
+        }
+      }
+      if (f0.accountType === "company" && files.length > 0) {
+        const gate = await requestNationalIdOcrGate({
+          file: files[0],
+          expectedLegalName: f0.companyLegalName.trim(),
+          googleDisplayName,
+        });
+        if (!gate.ok) {
+          if (!cancelled) {
+            setError(gate.message);
+            setRegisterPhase("idle");
+            resumeAttemptedRef.current = false;
+          }
+          return;
+        }
+      }
       const folder: string =
         pending.form.accountType === "company"
           ? "commercial-registry"

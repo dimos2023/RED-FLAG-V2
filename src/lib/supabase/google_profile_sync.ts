@@ -33,19 +33,42 @@ export async function upsertProfileFromGoogleUser(
     return { ok: true };
   }
   const fullName: string | null = resolveGoogleDisplayName(user);
-  const row: Record<string, string | null> = {
-    id: user.id,
+  const ts: string = new Date().toISOString();
+  const patch: {
+    email: string | null;
+    updated_at: string;
+    full_name?: string;
+  } = {
     email: user.email ?? null,
-    updated_at: new Date().toISOString(),
+    updated_at: ts,
   };
   if (fullName) {
-    row.full_name = fullName;
+    patch.full_name = fullName;
   }
-  const { error } = await supabase.from("profiles").upsert(row, {
-    onConflict: "id",
-  });
-  if (error) {
-    return { ok: false, message: error.message };
+  const { data: updatedRows, error: updateErr } = await supabase
+    .schema("public")
+    .from("profiles")
+    .update(patch)
+    .eq("id", user.id)
+    .select("id");
+  if (updateErr) {
+    return { ok: false, message: updateErr.message };
+  }
+  if (updatedRows && updatedRows.length > 0) {
+    return { ok: true };
+  }
+  const { error: insertErr } = await supabase
+    .schema("public")
+    .from("profiles")
+    .insert({
+      id: user.id,
+      email: user.email ?? null,
+      is_verified: false,
+      verification_status: "pending",
+      full_name: fullName,
+    });
+  if (insertErr) {
+    return { ok: false, message: insertErr.message };
   }
   return { ok: true };
 }
