@@ -47,5 +47,7 @@ export type UserProfile = {
   companyLocationNote?: string;
   nationalIdStoragePath?: string;
   nationalIdStoragePaths?: string[];
+  /** National ID number as entered by the user (digits); used with OCR cross-check. */
+  nationalIdNumber?: string;
   commercialRegistryStoragePaths?: string[];
 };

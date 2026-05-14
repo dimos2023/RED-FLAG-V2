@@ -43,16 +43,30 @@ export async function profileSessionGate(
   if (!requiresVerifiedProfile(pathname)) {
     return null;
   }
+  console.log("[profileSessionGate] checking protected route", {
+    pathname,
+    userId: user.id,
+  });
   const { data: row } = await supabase
     .schema("public")
     .from("profiles")
     .select(
-      "full_name, full_legal_name, phone, shipping_line1, shipping_city, shipping_country, national_id_storage_path, company_legal_name, company_address_line1, company_city, company_country, company_location_note, verification_status, is_verified",
+      "full_name, full_legal_name, phone, shipping_line1, shipping_city, shipping_country, national_id_number, national_id_storage_path, company_legal_name, company_address_line1, company_city, company_country, company_location_note, verification_status, is_verified",
     )
     .eq("id", user.id)
     .maybeSingle();
   const prof: ProfileRowForAccess | null = row as ProfileRowForAccess | null;
+  console.log("[profileSessionGate] public.profiles row", {
+    userId: user.id,
+    hasRow: Boolean(prof),
+    verificationStatus: prof?.verification_status ?? null,
+    registrationComplete: isProfileRegistrationComplete(prof),
+  });
   if (!isProfileRegistrationComplete(prof)) {
+    console.log("[profileSessionGate] redirect incomplete → /complete-registration", {
+      userId: user.id,
+      pathname,
+    });
     const redirect: NextResponse = NextResponse.redirect(
       new URL("/complete-registration?reason=incomplete", request.url),
     );
@@ -60,11 +74,17 @@ export async function profileSessionGate(
     return redirect;
   }
   if (!isVerificationApproved(prof)) {
+    console.log("[profileSessionGate] redirect unverified → /complete-registration", {
+      userId: user.id,
+      pathname,
+      verificationStatus: prof?.verification_status ?? null,
+    });
     const redirect: NextResponse = NextResponse.redirect(
       new URL("/complete-registration?reason=unverified", request.url),
     );
     copyCookies(baseResponse, redirect);
     return redirect;
   }
+  console.log("[profileSessionGate] access allowed", { userId: user.id, pathname });
   return null;
 }

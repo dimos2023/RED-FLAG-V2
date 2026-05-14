@@ -28,6 +28,8 @@ export type PendingProfileFormV1 = {
   companyPostalCode: string;
   companyCountry: string;
   companyLocationNote: string;
+  /** Optional for legacy session payloads; required for new individual registrations. */
+  nationalIdNumber?: string;
 };
 
 export type PendingProfileFileV1 = {

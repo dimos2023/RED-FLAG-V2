@@ -6,12 +6,17 @@ export async function requestNationalIdOcrGate(params: {
   file: File;
   expectedLegalName: string;
   googleDisplayName: string | null;
+  expectedNationalId?: string;
 }): Promise<NationalIdOcrGateResult> {
   const body: FormData = new FormData();
   body.append("file", params.file);
   body.append("expectedLegalName", params.expectedLegalName.trim());
   if (params.googleDisplayName?.trim()) {
     body.append("googleDisplayName", params.googleDisplayName.trim());
+  }
+  const nid: string | undefined = params.expectedNationalId?.trim();
+  if (nid && nid.length > 0) {
+    body.append("expectedNationalId", nid);
   }
   const res: Response = await fetch("/api/identity/ocr-national-id", {
     method: "POST",

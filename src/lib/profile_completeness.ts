@@ -7,6 +7,7 @@ export type ProfileRowForAccess = {
   shipping_line1: string | null;
   shipping_city: string | null;
   shipping_country: string | null;
+  national_id_number: string | null;
   national_id_storage_path: unknown;
   company_legal_name: string | null;
   company_address_line1: string | null;
@@ -16,6 +17,13 @@ export type ProfileRowForAccess = {
   verification_status: string | null;
   is_verified: boolean | null;
 };
+
+function nationalIdDigitsCount(value: string | null | undefined): number {
+  if (!value?.trim()) {
+    return 0;
+  }
+  return value.replace(/\D/g, "").length;
+}
 
 function nationalPathsNonEmpty(raw: unknown): boolean {
   if (raw == null) {
@@ -58,6 +66,7 @@ export function isProfileRegistrationComplete(
       row.shipping_line1?.trim() &&
       row.shipping_city?.trim() &&
       row.shipping_country?.trim() &&
+      nationalIdDigitsCount(row.national_id_number) >= 8 &&
       nationalPathsNonEmpty(row.national_id_storage_path),
   );
 }
@@ -97,6 +106,7 @@ export function profileRowFromUserProfile(
     shipping_line1: user.shippingLine1 ?? null,
     shipping_city: user.shippingCity ?? null,
     shipping_country: user.shippingCountry ?? null,
+    national_id_number: user.nationalIdNumber ?? null,
     national_id_storage_path: paths,
     company_legal_name: user.companyLegalName ?? null,
     company_address_line1: user.companyAddressLine1 ?? null,

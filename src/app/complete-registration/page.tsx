@@ -40,6 +40,7 @@ function CompleteRegistrationInner() {
   const [shippingPostalCode, setShippingPostalCode] = useState<string>("");
   const [shippingCountry, setShippingCountry] = useState<string>("");
   const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
+  const [nationalIdNumber, setNationalIdNumber] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(false);
   const copy = useMemo(() => {
@@ -61,6 +62,7 @@ function CompleteRegistrationInner() {
         region: "المنطقة (اختياري)",
         postal: "الرمز البريدي (اختياري)",
         country: "الدولة",
+        nationalIdNumber: "الرقم القومي (كما على البطاقة)",
         idUpload: "صورة الهوية / البطاقة",
         submit: "حفظ والتحقق",
         loading: "جاري المعالجة…",
@@ -85,6 +87,7 @@ function CompleteRegistrationInner() {
       region: "Region (optional)",
       postal: "Postal code (optional)",
       country: "Country",
+      nationalIdNumber: "National ID number (as on card)",
       idUpload: "National ID / government ID image",
       submit: "Save and verify",
       loading: "Processing…",
@@ -105,6 +108,7 @@ function CompleteRegistrationInner() {
     setShippingRegion(user.shippingRegion ?? "");
     setShippingPostalCode(user.shippingPostalCode ?? "");
     setShippingCountry(user.shippingCountry ?? "");
+    setNationalIdNumber(user.nationalIdNumber ?? "");
   }, [user]);
   useEffect(() => {
     if (!user) {
@@ -222,6 +226,15 @@ function CompleteRegistrationInner() {
       );
       return;
     }
+    const nidDigits: string = nationalIdNumber.replace(/\D/g, "");
+    if (nidDigits.length < 8) {
+      setError(
+        isArabic
+          ? "أدخل الرقم القومي كاملاً (8 أرقام على الأقل)."
+          : "Enter your national ID number (at least 8 digits) as on the card.",
+      );
+      return;
+    }
     const sb = createSupabaseBrowserClient();
     if (!sb) {
       setError("Supabase is not configured.");
@@ -234,6 +247,7 @@ function CompleteRegistrationInner() {
       file: nationalIdFile,
       expectedLegalName: fullLegalName.trim(),
       googleDisplayName,
+      expectedNationalId: nationalIdNumber,
     });
     if (!gate.ok) {
       setPending(false);
@@ -261,6 +275,7 @@ function CompleteRegistrationInner() {
       shippingRegion: shippingRegion.trim(),
       shippingPostalCode: shippingPostalCode.trim(),
       shippingCountry: shippingCountry.trim(),
+      nationalIdNumber: nationalIdNumber.replace(/\D/g, ""),
       nationalIdStoragePaths: [up.path],
     });
     if (!upsert.ok) {
@@ -366,6 +381,18 @@ function CompleteRegistrationInner() {
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               setShippingCountry(e.target.value)
             }
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+          />
+          <label className="block text-xs text-slate-500">
+            {copy.nationalIdNumber}
+          </label>
+          <input
+            value={nationalIdNumber}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setNationalIdNumber(e.target.value)
+            }
+            inputMode="numeric"
+            autoComplete="off"
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
           />
           <label className="block text-xs text-slate-500">{copy.idUpload}</label>

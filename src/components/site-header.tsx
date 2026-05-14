@@ -1,11 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { createPortal } from "react-dom";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 
+const HEADER_PORTAL_ID: string = "rf-site-header-portal";
+
 export function SiteHeader() {
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    let host: HTMLElement | null = document.getElementById(HEADER_PORTAL_ID);
+    if (!host) {
+      host = document.createElement("div");
+      host.id = HEADER_PORTAL_ID;
+      document.body.appendChild(host);
+    }
+    setPortalHost(host);
+    return () => {
+      /* keep host mounted for route transitions */
+    };
+  }, []);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const {
     user,
@@ -45,12 +61,12 @@ export function SiteHeader() {
         signIn: "Sign in",
         register: "Register",
         langButton: "AR",
-      menu: "Menu",
-      close: "Close",
+        menu: "Menu",
+        close: "Close",
       };
 
-  return (
-    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+  const headerInner: ReactNode = (
+    <>
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="group flex items-center gap-2">
           <span className="relative h-6 w-5 overflow-hidden rounded-[2px] [clip-path:polygon(50%_0%,96%_18%,86%_84%,50%_100%,14%_84%,4%_18%)] ring-1 ring-red-300/50 shadow-[0_0_16px_rgba(220,38,38,0.45)]">
@@ -341,6 +357,30 @@ export function SiteHeader() {
           </div>
         </div>
       ) : null}
-    </header>
+    </>
+  );
+
+  const headerClassName: string =
+    portalHost != null
+      ? "fixed top-0 left-0 right-0 z-[100] border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md"
+      : "sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md";
+
+  return (
+    <>
+      {portalHost ? (
+        <div
+          className="pointer-events-none h-14 shrink-0 md:h-[52px]"
+          aria-hidden
+        />
+      ) : null}
+      {portalHost ? (
+        createPortal(
+          <header className={headerClassName}>{headerInner}</header>,
+          portalHost,
+        )
+      ) : (
+        <header className={headerClassName}>{headerInner}</header>
+      )}
+    </>
   );
 }

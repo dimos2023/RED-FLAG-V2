@@ -15,6 +15,7 @@ export type UpsertRegistrationProfileInput =
       shippingRegion: string;
       shippingPostalCode: string;
       shippingCountry: string;
+      nationalIdNumber: string;
       nationalIdStoragePaths: string[];
     }
   | {
@@ -46,6 +47,13 @@ export async function upsertRegistrationProfile(
   const paths: string[] =
     input.nationalIdStoragePaths.length > 0 ? input.nationalIdStoragePaths : [];
   if (input.accountType === "individual") {
+    const nidDigits: string = input.nationalIdNumber.replace(/\D/g, "");
+    if (nidDigits.length < 8) {
+      return {
+        ok: false,
+        message: "National ID number must contain at least 8 digits.",
+      };
+    }
     const row: Record<string, unknown> = {
       id: input.userId,
       email: input.userEmail.trim(),
@@ -68,6 +76,7 @@ export async function upsertRegistrationProfile(
       company_country: null,
       company_location_note: null,
       national_id_storage_path: paths.length > 0 ? paths : null,
+      national_id_number: nidDigits,
       phone: input.phone.trim(),
       verification_status: "pending",
     };

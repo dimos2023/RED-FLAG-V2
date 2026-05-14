@@ -83,6 +83,7 @@ type ProfileRow = {
   company_country: string | null;
   company_location_note: string | null;
   national_id_storage_path: string[] | string | null;
+  national_id_number: string | null;
 };
 
 function parsePrefixedLine(
@@ -332,7 +333,7 @@ export function AuthProvider({
       .schema("public")
       .from("profiles")
       .select(
-        "email, is_verified, verification_status, full_name, updated_at, full_legal_name, phone, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path",
+        "email, is_verified, verification_status, full_name, updated_at, full_legal_name, phone, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path, national_id_number",
       )
       .eq("id", supabaseUser.id)
       .maybeSingle()
@@ -394,6 +395,9 @@ export function AuthProvider({
                 ? normPaths
                 : fallback.commercialRegistryStoragePaths
               : fallback.commercialRegistryStoragePaths,
+            nationalIdNumber:
+              row.national_id_number?.trim() ||
+              fallback.nationalIdNumber,
           };
           writeStoredProfile(next);
           return next;

@@ -41,10 +41,42 @@ export function ocrTextOverlapsGoogleName(
   return gTokens.some((t: string) => haystack.includes(t));
 }
 
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/**
+ * Finds digit runs in OCR text (e.g. national ID). Keeps longest plausible run (≥ 8 digits).
+ */
+export function extractNationalIdDigitRuns(ocrText: string): string[] {
+  const matches: RegExpMatchArray | null = ocrText.match(/\d{8,16}/g);
+  if (!matches) {
+    return [];
+  }
+  return [...new Set(matches.map((m: string) => digitsOnly(m)))];
+}
+
+export function nationalIdMatchesOcr(
+  ocrText: string,
+  expectedNationalId: string,
+): boolean {
+  const expected: string = digitsOnly(expectedNationalId);
+  if (expected.length < 8) {
+    return false;
+  }
+  const runs: string[] = extractNationalIdDigitRuns(ocrText);
+  const compactOcr: string = digitsOnly(ocrText);
+  return (
+    runs.some((r: string) => r.includes(expected) || expected.includes(r)) ||
+    compactOcr.includes(expected)
+  );
+}
+
 export function isIdentityConsistentWithOcr(
   ocrText: string,
   expectedLegalName: string,
   googleDisplayName: string | null,
+  expectedNationalId?: string | null,
 ): boolean {
   if (!ocrText.trim()) {
     return false;
@@ -52,5 +84,12 @@ export function isIdentityConsistentWithOcr(
   if (!ocrTextContainsExpectedName(ocrText, expectedLegalName)) {
     return false;
   }
-  return ocrTextOverlapsGoogleName(ocrText, googleDisplayName);
+  if (!ocrTextOverlapsGoogleName(ocrText, googleDisplayName)) {
+    return false;
+  }
+  const nid: string | undefined = expectedNationalId?.trim();
+  if (nid && nid.length > 0) {
+    return nationalIdMatchesOcr(ocrText, nid);
+  }
+  return true;
 }

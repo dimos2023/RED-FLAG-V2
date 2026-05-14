@@ -41,6 +41,7 @@ function RegisterPageContent() {
   const [individualIdentityConfirmed, setIndividualIdentityConfirmed] =
     useState<boolean>(false);
   const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
+  const [nationalIdNumber, setNationalIdNumber] = useState<string>("");
   const [fullLegalName, setFullLegalName] = useState<string>("");
   const [shippingLine1, setShippingLine1] = useState<string>("");
   const [shippingLine2, setShippingLine2] = useState<string>("");
@@ -129,6 +130,13 @@ function RegisterPageContent() {
       }
       if (!nationalIdFile) {
         setError("Upload a photo or scan of your national / government ID.");
+        return;
+      }
+      const nidDigits: string = nationalIdNumber.replace(/\D/g, "");
+      if (nidDigits.length < 8) {
+        setError(
+          "Enter your national ID number (at least 8 digits) exactly as on the card.",
+        );
         return;
       }
     } else {
@@ -230,6 +238,7 @@ function RegisterPageContent() {
           file: nationalIdFile,
           expectedLegalName: fullLegalName.trim(),
           googleDisplayName,
+          expectedNationalId: nationalIdNumber,
         });
         if (!gate.ok) {
           setPending(false);
@@ -299,6 +308,7 @@ function RegisterPageContent() {
               shippingRegion: shippingRegion.trim(),
               shippingPostalCode: shippingPostalCode.trim(),
               shippingCountry: shippingCountry.trim(),
+              nationalIdNumber: nationalIdNumber.replace(/\D/g, ""),
               nationalIdStoragePaths: storagePaths,
             })
           : await upsertRegistrationProfile(sb, {
@@ -360,6 +370,10 @@ function RegisterPageContent() {
         companyPostalCode: companyPostalCode.trim(),
         companyCountry: companyCountry.trim(),
         companyLocationNote: companyLocationNote.trim(),
+        nationalIdNumber:
+          accountType === "individual"
+            ? nationalIdNumber.replace(/\D/g, "")
+            : "",
       };
       writePendingProfilePayload({
         version: 1,
@@ -458,9 +472,22 @@ function RegisterPageContent() {
       resumeAttemptedRef.current = true;
       setRegisterPhase("upload");
       setError("");
+      const f0 = pending.form;
+      if (
+        f0.accountType === "individual" &&
+        (f0.nationalIdNumber ?? "").replace(/\D/g, "").length < 8
+      ) {
+        if (!cancelled) {
+          setError(
+            "This confirmation link used an older registration form. Please register again and enter your national ID number.",
+          );
+          setRegisterPhase("idle");
+          resumeAttemptedRef.current = false;
+        }
+        return;
+      }
       const paths: string[] = [];
       const files = pending.files.map(pendingFileToFile);
-      const f0 = pending.form;
       const googleDisplayName: string | null = data.user
         ? resolveGoogleDisplayName(data.user)
         : null;
@@ -469,6 +496,7 @@ function RegisterPageContent() {
           file: files[0],
           expectedLegalName: f0.fullLegalName.trim(),
           googleDisplayName,
+          expectedNationalId: f0.nationalIdNumber ?? "",
         });
         if (!gate.ok) {
           if (!cancelled) {
@@ -535,6 +563,7 @@ function RegisterPageContent() {
               shippingRegion: f.shippingRegion.trim(),
               shippingPostalCode: f.shippingPostalCode.trim(),
               shippingCountry: f.shippingCountry.trim(),
+              nationalIdNumber: (f.nationalIdNumber ?? "").replace(/\D/g, ""),
               nationalIdStoragePaths: paths,
             })
           : await upsertRegistrationProfile(sb, {
@@ -571,6 +600,7 @@ function RegisterPageContent() {
       setShippingRegion(f.shippingRegion.trim());
       setShippingPostalCode(f.shippingPostalCode.trim());
       setShippingCountry(f.shippingCountry.trim());
+      setNationalIdNumber((f.nationalIdNumber ?? "").replace(/\D/g, ""));
       setCompanyLegalName(f.companyLegalName.trim());
       setCrNumber(f.crNumber.trim());
       setCompanyEmail(f.companyEmail.trim());
@@ -880,6 +910,23 @@ function RegisterPageContent() {
                       className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    National ID number (digits on card)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    required
+                    value={nationalIdNumber}
+                    onChange={(e) => setNationalIdNumber(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/30"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Must match the number printed on your ID; used with OCR to verify the upload.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
