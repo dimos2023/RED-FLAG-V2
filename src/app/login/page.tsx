@@ -96,13 +96,29 @@ function LoginPageContent() {
       const { data: userData } = await supabase.auth.getUser();
       const uid: string | undefined = userData.user?.id;
       if (uid) {
-        const { data: adminRow, error: adminError } = await supabase
-          .schema("public")
-          .from("app_admins")
-          .select("user_id")
-          .eq("user_id", uid)
-          .maybeSingle();
-        const isAppAdmin: boolean = !adminError && adminRow !== null;
+        let isAppAdmin: boolean = false;
+        try {
+          const { data: adminRow, error: adminError } = await supabase
+            .schema("public")
+            .from("app_admins")
+            .select("user_id")
+            .eq("user_id", uid)
+            .maybeSingle();
+          isAppAdmin = adminError === null && adminRow !== null;
+          if (adminError) {
+            console.warn(
+              "[login] app_admins single-shot select failed; treating as non-admin",
+              adminError.message,
+            );
+          }
+        } catch (err: unknown) {
+          const msg: string = err instanceof Error ? err.message : String(err);
+          console.warn(
+            "[login] app_admins select threw; treating as non-admin",
+            msg,
+          );
+          isAppAdmin = false;
+        }
         const nextSafe: string | null = sanitizeInternalNextPath(
           searchParams.get("next"),
         );

@@ -313,62 +313,40 @@ export function AuthProvider({
     setIsAdmin(false);
     setIsAdminRoleResolved(false);
     let cancelled: boolean = false;
-    const adminLookupTimeoutMs: number = 8000;
     void (async (): Promise<void> => {
-      const queryPromise = Promise.resolve(
-        supabase
+      try {
+        const { data, error } = await supabase
           .schema("public")
           .from("app_admins")
           .select("user_id")
           .eq("user_id", userId)
-          .maybeSingle(),
-      ).then(
-        (result) => ({ kind: "result" as const, result }),
-        (err: unknown) => ({
-          kind: "thrown" as const,
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      );
-      const outcome = await Promise.race([
-        queryPromise,
-        new Promise<{ kind: "timeout" }>((resolve) => {
-          setTimeout(() => {
-            resolve({ kind: "timeout" });
-          }, adminLookupTimeoutMs);
-        }),
-      ]);
-      if (cancelled) {
-        return;
-      }
-      if (outcome.kind === "timeout") {
-        console.warn(
-          "[auth] app_admins lookup timed out; treating user as non-admin",
-        );
-        setIsAdmin(false);
+          .maybeSingle();
+        if (cancelled) {
+          return;
+        }
+        if (error) {
+          console.warn(
+            "[auth] app_admins single-shot select failed; treating user as non-admin",
+            error.message,
+          );
+          setIsAdmin(false);
+          setIsAdminRoleResolved(true);
+          return;
+        }
+        setIsAdmin(data !== null);
         setIsAdminRoleResolved(true);
-        return;
-      }
-      if (outcome.kind === "thrown") {
+      } catch (err: unknown) {
+        if (cancelled) {
+          return;
+        }
+        const msg: string = err instanceof Error ? err.message : String(err);
         console.warn(
           "[auth] app_admins select threw; treating user as non-admin",
-          outcome.message,
+          msg,
         );
         setIsAdmin(false);
         setIsAdminRoleResolved(true);
-        return;
       }
-      const { data, error } = outcome.result;
-      if (error) {
-        console.warn(
-          "[auth] app_admins select error; treating user as non-admin",
-          error.message,
-        );
-        setIsAdmin(false);
-        setIsAdminRoleResolved(true);
-        return;
-      }
-      setIsAdmin(data !== null);
-      setIsAdminRoleResolved(true);
     })();
     return () => {
       cancelled = true;

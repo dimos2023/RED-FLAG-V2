@@ -46,6 +46,8 @@ function CompleteRegistrationInner() {
   const [pending, setPending] = useState<boolean>(false);
   const verifiedAutoRedirectRef = useRef<boolean>(false);
   const completeRegUserIdRef = useRef<string | undefined>(undefined);
+  /** Prevents profile refresh from overwriting fields the user is editing (OCR / submit). */
+  const formSeededForUserIdRef = useRef<string | undefined>(undefined);
   const copy = useMemo(() => {
     if (isArabic) {
       return {
@@ -104,12 +106,22 @@ function CompleteRegistrationInner() {
     if (id !== completeRegUserIdRef.current) {
       completeRegUserIdRef.current = id;
       verifiedAutoRedirectRef.current = false;
+      if (id === undefined) {
+        formSeededForUserIdRef.current = undefined;
+      }
     }
   }, [user?.id]);
   useEffect(() => {
-    if (!user) {
+    if (pending) {
       return;
     }
+    if (!user?.id) {
+      return;
+    }
+    if (formSeededForUserIdRef.current === user.id) {
+      return;
+    }
+    formSeededForUserIdRef.current = user.id;
     setFullLegalName(user.fullLegalName ?? user.fullName ?? "");
     setPhone(user.phone ?? "");
     setShippingLine1(user.shippingLine1 ?? "");
@@ -119,7 +131,7 @@ function CompleteRegistrationInner() {
     setShippingPostalCode(user.shippingPostalCode ?? "");
     setShippingCountry(user.shippingCountry ?? "");
     setNationalIdNumber(user.nationalIdNumber ?? "");
-  }, [user]);
+  }, [user, pending]);
   useEffect(() => {
     if (!user) {
       return;
@@ -215,7 +227,6 @@ function CompleteRegistrationInner() {
     }
     const authUser = supabaseUser;
     const profileUser = user;
-    setError("");
     if (!fullLegalName.trim()) {
       setError(isArabic ? "أدخل الاسم الكامل." : "Enter full legal name.");
       return;
@@ -254,6 +265,7 @@ function CompleteRegistrationInner() {
       setError("Supabase is not configured.");
       return;
     }
+    setError("");
     setPending(true);
     const googleDisplayName: string | null =
       resolveGoogleDisplayName(authUser);

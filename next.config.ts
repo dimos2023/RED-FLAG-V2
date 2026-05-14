@@ -12,9 +12,28 @@ const nextPublicEnv: Record<string, string> | undefined = supabasePublic
     }
   : undefined;
 
-/** Tesseract.js (OCR) uses blob workers and may rely on eval in bundled worker code. */
+const VERCEL_FEEDBACK_ORIGINS: string = "https://vercel.live https://vercel.com";
+
+const supabaseConnectOrigin: string = supabasePublic?.url
+  ? new URL(supabasePublic.url).origin
+  : "";
+
+/** Tesseract.js (OCR) uses blob workers; Vercel Toolbar / Feedback needs vercel.* in script/connect/frame. */
 const CONTENT_SECURITY_POLICY: string = [
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
+  `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: ${VERCEL_FEEDBACK_ORIGINS}`,
+  [
+    "connect-src",
+    "'self'",
+    "blob:",
+    "data:",
+    VERCEL_FEEDBACK_ORIGINS,
+    supabaseConnectOrigin,
+    "https://*.supabase.co",
+    "wss://*.supabase.co",
+  ]
+    .filter((token: string) => token.length > 0)
+    .join(" "),
+  `frame-src 'self' ${VERCEL_FEEDBACK_ORIGINS}`,
   "worker-src 'self' blob:",
 ].join("; ");
 
