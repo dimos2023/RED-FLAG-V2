@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
@@ -17,19 +17,34 @@ export default function PostOAuthPage() {
         : { working: "Finishing sign-in…" },
     [isArabic],
   );
+  const lastUserIdRef = useRef<string | undefined>(undefined);
+  const postOAuthNavigatedRef = useRef<boolean>(false);
+  useEffect(() => {
+    const uid: string | undefined = user?.id;
+    if (uid !== lastUserIdRef.current) {
+      lastUserIdRef.current = uid;
+      postOAuthNavigatedRef.current = false;
+    }
+  }, [user?.id]);
   useEffect(() => {
     if (!isHydrated) {
       return;
     }
-    if (!user) {
-      router.replace("/login?error=oauth_no_session");
+    if (!user?.id) {
+      if (!postOAuthNavigatedRef.current) {
+        postOAuthNavigatedRef.current = true;
+        router.replace("/login?error=oauth_no_session");
+      }
       return;
     }
     if (!isAdminRoleResolved) {
       return;
     }
-    router.replace(isAdmin ? "/admin/requests" : "/dashboard");
-  }, [isHydrated, user, isAdmin, isAdminRoleResolved, router]);
+    if (!postOAuthNavigatedRef.current) {
+      postOAuthNavigatedRef.current = true;
+      router.replace(isAdmin ? "/admin/requests" : "/dashboard");
+    }
+  }, [isHydrated, user?.id, isAdmin, isAdminRoleResolved, router]);
   return (
     <div className="min-h-dvh bg-transparent">
       <SiteHeader />

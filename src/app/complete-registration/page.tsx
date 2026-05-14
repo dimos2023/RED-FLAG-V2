@@ -6,6 +6,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -43,6 +44,8 @@ function CompleteRegistrationInner() {
   const [nationalIdNumber, setNationalIdNumber] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(false);
+  const verifiedAutoRedirectRef = useRef<boolean>(false);
+  const completeRegUserIdRef = useRef<string | undefined>(undefined);
   const copy = useMemo(() => {
     if (isArabic) {
       return {
@@ -97,6 +100,13 @@ function CompleteRegistrationInner() {
     };
   }, [isArabic]);
   useEffect(() => {
+    const id: string | undefined = user?.id;
+    if (id !== completeRegUserIdRef.current) {
+      completeRegUserIdRef.current = id;
+      verifiedAutoRedirectRef.current = false;
+    }
+  }, [user?.id]);
+  useEffect(() => {
     if (!user) {
       return;
     }
@@ -114,8 +124,12 @@ function CompleteRegistrationInner() {
     if (!user) {
       return;
     }
+    if (verifiedAutoRedirectRef.current) {
+      return;
+    }
     const row = profileRowFromUserProfile(user);
     if (isProfileRegistrationComplete(row) && isVerificationApproved(row)) {
+      verifiedAutoRedirectRef.current = true;
       void router.replace("/dashboard");
     }
   }, [user, router]);

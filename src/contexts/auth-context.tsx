@@ -238,8 +238,10 @@ export function AuthProvider({
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [profileRefreshNonce, setProfileRefreshNonce] = useState<number>(0);
   const googleProfileSyncedForUserIdRef = useRef<string | null>(null);
+  const supabaseUserRef = useRef<User | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const hasSupabase: boolean = supabase !== null;
+  supabaseUserRef.current = supabaseUser;
 
   useEffect(() => {
     setUser(readStoredProfile());
@@ -302,7 +304,8 @@ export function AuthProvider({
       setIsAdminRoleResolved(true);
       return;
     }
-    if (!supabaseUser) {
+    const userId: string | undefined = supabaseUser?.id;
+    if (!userId) {
       setIsAdmin(false);
       setIsAdminRoleResolved(true);
       return;
@@ -310,38 +313,74 @@ export function AuthProvider({
     setIsAdmin(false);
     setIsAdminRoleResolved(false);
     let cancelled: boolean = false;
+    const adminLookupTimeoutMs: number = 8000;
     void (async (): Promise<void> => {
-      try {
-        const { data, error } = await supabase
+      const queryPromise = Promise.resolve(
+        supabase
           .schema("public")
           .from("app_admins")
           .select("user_id")
-          .eq("user_id", supabaseUser.id)
-          .maybeSingle();
-        if (cancelled) {
-          return;
-        }
-        setIsAdmin(!error && data !== null);
-        setIsAdminRoleResolved(true);
-      } catch (err: unknown) {
-        if (cancelled) {
-          return;
-        }
-        const msg: string = err instanceof Error ? err.message : String(err);
-        console.warn("[auth] app_admins select threw", msg);
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ).then(
+        (result) => ({ kind: "result" as const, result }),
+        (err: unknown) => ({
+          kind: "thrown" as const,
+          message: err instanceof Error ? err.message : String(err),
+        }),
+      );
+      const outcome = await Promise.race([
+        queryPromise,
+        new Promise<{ kind: "timeout" }>((resolve) => {
+          setTimeout(() => {
+            resolve({ kind: "timeout" });
+          }, adminLookupTimeoutMs);
+        }),
+      ]);
+      if (cancelled) {
+        return;
+      }
+      if (outcome.kind === "timeout") {
+        console.warn(
+          "[auth] app_admins lookup timed out; treating user as non-admin",
+        );
         setIsAdmin(false);
         setIsAdminRoleResolved(true);
+        return;
       }
+      if (outcome.kind === "thrown") {
+        console.warn(
+          "[auth] app_admins select threw; treating user as non-admin",
+          outcome.message,
+        );
+        setIsAdmin(false);
+        setIsAdminRoleResolved(true);
+        return;
+      }
+      const { data, error } = outcome.result;
+      if (error) {
+        console.warn(
+          "[auth] app_admins select error; treating user as non-admin",
+          error.message,
+        );
+        setIsAdmin(false);
+        setIsAdminRoleResolved(true);
+        return;
+      }
+      setIsAdmin(data !== null);
+      setIsAdminRoleResolved(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [supabase, supabaseUser]);
+  }, [supabase, supabaseUser?.id]);
 
+  // Profile hydrate: depend on user id only — `supabaseUser` reference changes on token refresh and would re-fetch in a loop.
   useEffect(() => {
-    if (!supabase || !supabaseUser) {
+    if (!supabase || !supabaseUser?.id) {
       return;
     }
+    const hydrateUserId: string = supabaseUser.id;
     let cancelled: boolean = false;
     void (async (): Promise<void> => {
       try {
@@ -349,7 +388,7 @@ export function AuthProvider({
           .schema("public")
           .from("profiles")
           .select(PROFILE_HYDRATE_SELECT_PRIMARY)
-          .eq("id", supabaseUser.id)
+          .eq("id", hydrateUserId)
           .maybeSingle();
         if (res.error) {
           console.warn(
@@ -360,7 +399,7 @@ export function AuthProvider({
             .schema("public")
             .from("profiles")
             .select(PROFILE_HYDRATE_SELECT_FALLBACK)
-            .eq("id", supabaseUser.id)
+            .eq("id", hydrateUserId)
             .maybeSingle();
         }
         if (cancelled || res.error || res.data === null) {
@@ -370,9 +409,10 @@ export function AuthProvider({
           return;
         }
         const row: ProfileRow = res.data as unknown as ProfileRow;
+        const authSnapshot: User = supabaseUserRef.current ?? supabaseUser;
         setUser((prev) => {
           const fallback: UserProfile =
-            prev ?? buildProfileFromAuthUser(supabaseUser);
+            prev ?? buildProfileFromAuthUser(authSnapshot);
           const note: string | null = row.company_location_note;
           const crParsed: string | undefined = parsePrefixedLine(note, "CR:");
           const emailParsed: string | undefined = parsePrefixedLine(
@@ -438,21 +478,27 @@ export function AuthProvider({
     return () => {
       cancelled = true;
     };
-  }, [supabase, supabaseUser, profileRefreshNonce]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- stable identity is supabaseUser.id; full object changes on token refresh without id change
+  }, [supabase, supabaseUser?.id, profileRefreshNonce]);
 
   useEffect(() => {
-    if (!supabase || !supabaseUser) {
+    const uid: string | undefined = supabaseUser?.id;
+    if (!supabase || !uid) {
       return;
     }
-    if (!hasGoogleIdentity(supabaseUser)) {
+    const googleUser: User | null = supabaseUserRef.current;
+    if (!googleUser || googleUser.id !== uid) {
       return;
     }
-    if (googleProfileSyncedForUserIdRef.current === supabaseUser.id) {
+    if (!hasGoogleIdentity(googleUser)) {
       return;
     }
-    googleProfileSyncedForUserIdRef.current = supabaseUser.id;
+    if (googleProfileSyncedForUserIdRef.current === googleUser.id) {
+      return;
+    }
+    googleProfileSyncedForUserIdRef.current = googleUser.id;
     let cancelled: boolean = false;
-    void upsertProfileFromGoogleUser(supabase, supabaseUser).then((result) => {
+    void upsertProfileFromGoogleUser(supabase, googleUser).then((result) => {
       if (cancelled) {
         return;
       }
@@ -465,7 +511,7 @@ export function AuthProvider({
     return () => {
       cancelled = true;
     };
-  }, [supabase, supabaseUser]);
+  }, [supabase, supabaseUser?.id]);
 
   const signInWithGoogle = useCallback(
     async (options?: { nextPath?: string }): Promise<SignInResult> => {

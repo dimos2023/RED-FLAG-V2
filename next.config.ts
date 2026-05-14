@@ -12,11 +12,30 @@ const nextPublicEnv: Record<string, string> | undefined = supabasePublic
     }
   : undefined;
 
+/** Tesseract.js (OCR) uses blob workers and may rely on eval in bundled worker code. */
+const CONTENT_SECURITY_POLICY: string = [
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
+  "worker-src 'self' blob:",
+].join("; ");
+
 const nextConfig: NextConfig = {
   ...(nextPublicEnv ? { env: nextPublicEnv } : {}),
   async redirects() {
     return [
       { source: "/admin-login", destination: "/login", permanent: false },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: CONTENT_SECURITY_POLICY,
+          },
+        ],
+      },
     ];
   },
   reactStrictMode: true,

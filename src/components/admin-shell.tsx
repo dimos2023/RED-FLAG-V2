@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
 import { sanitizeInternalNextPath } from "@/lib/safe_next_path";
@@ -16,12 +16,28 @@ export function AdminShell({ children }: AdminShellProps) {
   const pathname: string = usePathname();
   const { user, isAdmin, isAdminRoleResolved, isHydrated, hasSupabase } =
     useAuth();
+  const lastUserIdRef = useRef<string | undefined>(undefined);
+  const loginRedirectSentRef = useRef<boolean>(false);
+  const forbiddenRedirectSentRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const uid: string | undefined = user?.id;
+    if (uid !== lastUserIdRef.current) {
+      lastUserIdRef.current = uid;
+      loginRedirectSentRef.current = false;
+      forbiddenRedirectSentRef.current = false;
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isHydrated) {
       return;
     }
-    if (!user) {
+    if (!user?.id) {
+      if (loginRedirectSentRef.current) {
+        return;
+      }
+      loginRedirectSentRef.current = true;
       const loginUrl: URL = new URL("/login", window.location.origin);
       const nextPath: string =
         sanitizeInternalNextPath(pathname) ?? "/admin/requests";
@@ -33,11 +49,15 @@ export function AdminShell({ children }: AdminShellProps) {
       return;
     }
     if (!hasSupabase || !isAdmin) {
+      if (forbiddenRedirectSentRef.current) {
+        return;
+      }
+      forbiddenRedirectSentRef.current = true;
       router.replace("/dashboard?notice=forbidden-admin");
     }
   }, [
     isHydrated,
-    user,
+    user?.id,
     isAdmin,
     isAdminRoleResolved,
     hasSupabase,
@@ -45,7 +65,13 @@ export function AdminShell({ children }: AdminShellProps) {
     pathname,
   ]);
 
-  if (!isHydrated || !user || !hasSupabase || !isAdminRoleResolved || !isAdmin) {
+  if (
+    !isHydrated ||
+    !user?.id ||
+    !hasSupabase ||
+    !isAdminRoleResolved ||
+    !isAdmin
+  ) {
     return (
       <div className="min-h-dvh bg-transparent">
         <SiteHeader />

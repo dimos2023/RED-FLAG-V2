@@ -33,6 +33,7 @@ function RegisterPageContent() {
     useAuth();
   const [step, setStep] = useState<Step>("terms");
   const resumeAttemptedRef = useRef<boolean>(false);
+  const registerVerifiedDashUserIdRef = useRef<string | undefined>(undefined);
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [accountType, setAccountType] = useState<AccountType>("individual");
   const [email, setEmail] = useState<string>("");
@@ -623,10 +624,21 @@ function RegisterPageContent() {
   }, [isHydrated, hasSupabase, searchParams, router]);
 
   useEffect(() => {
-    if (isHydrated && user?.isVerified) {
-      router.replace("/dashboard");
+    if (!isHydrated) {
+      return;
     }
-  }, [isHydrated, user, router]);
+    if (!user?.id || !user.isVerified) {
+      if (!user?.id) {
+        registerVerifiedDashUserIdRef.current = undefined;
+      }
+      return;
+    }
+    if (registerVerifiedDashUserIdRef.current === user.id) {
+      return;
+    }
+    registerVerifiedDashUserIdRef.current = user.id;
+    router.replace("/dashboard");
+  }, [isHydrated, user?.id, user?.isVerified, router]);
 
   return (
     <div className="min-h-dvh bg-transparent">
