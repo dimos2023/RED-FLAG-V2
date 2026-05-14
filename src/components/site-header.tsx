@@ -8,7 +8,8 @@ import { useLanguage } from "@/contexts/language-context";
 
 export function SiteHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const { user, isHydrated, signOut } = useAuth();
+  const { user, isHydrated, signOut, adminRoleCheckNotice, dismissAdminRoleCheckNotice } =
+    useAuth();
   const { isAdmin, isAdminResolved } = useAdminStatus();
   const { language, isArabic, toggleLanguage } = useLanguage();
   const copy = isArabic
@@ -47,6 +48,25 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+      {adminRoleCheckNotice === "timeout" ? (
+        <div
+          role="status"
+          className="border-b border-amber-900/40 bg-amber-950/50 px-4 py-2 text-center text-xs text-amber-100"
+        >
+          <span className="inline-block max-w-3xl">
+            {isArabic
+              ? "انتهت مهلة التحقق من صلاحيات الإدارة (10 ث). تمت المتابعة كمستخدم عادي."
+              : "Admin role check timed out (10s). Proceeding as a regular user."}
+          </span>{" "}
+          <button
+            type="button"
+            onClick={() => dismissAdminRoleCheckNotice()}
+            className="ml-2 underline decoration-amber-400/80 underline-offset-2 hover:text-white"
+          >
+            {isArabic ? "إخفاء" : "Dismiss"}
+          </button>
+        </div>
+      ) : null}
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="group flex items-center gap-2">
           <span className="relative h-6 w-5 overflow-hidden rounded-[2px] [clip-path:polygon(50%_0%,96%_18%,86%_84%,50%_100%,14%_84%,4%_18%)] ring-1 ring-red-300/50 shadow-[0_0_16px_rgba(220,38,38,0.45)]">

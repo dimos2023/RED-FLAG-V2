@@ -12,6 +12,7 @@ import {
   PROFILE_GATE_SELECT_MINIMAL,
   PROFILE_GATE_SELECT_PRIMARY,
 } from "@/lib/supabase/profile_columns";
+import { fetchAppAdminMembershipWithTimeout } from "@/lib/supabase/app_admin_lookup";
 
 function copyCookies(from: NextResponse, to: NextResponse): void {
   from.cookies.getAll().forEach((cookie) => {
@@ -30,22 +31,13 @@ export async function profileSessionGate(
     return null;
   }
   if (pathname.startsWith("/admin")) {
-    let adm: { user_id: string } | null = null;
-    try {
-      const { data, error } = await supabase
-        .schema("public")
-        .from("app_admins")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!error && data) {
-        adm = data;
-      }
-    } catch (err: unknown) {
-      const msg: string = err instanceof Error ? err.message : String(err);
-      console.log("[profileSessionGate] app_admins select threw", {
+    const outcome = await fetchAppAdminMembershipWithTimeout(supabase, user.id);
+    const adm: { user_id: string } | null = outcome.isAdmin
+      ? { user_id: user.id }
+      : null;
+    if (outcome.timedOut) {
+      console.warn("[profileSessionGate] app_admins timed out; denying admin route", {
         userId: user.id,
-        message: msg,
       });
     }
     if (!adm) {

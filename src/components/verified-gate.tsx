@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useLanguage } from "@/contexts/language-context";
 import { userProfileAllowsVerifiedAccess } from "@/lib/profile_completeness";
 
 type VerifiedGateProps = {
@@ -10,7 +11,15 @@ type VerifiedGateProps = {
 };
 
 export function VerifiedGate({ children }: VerifiedGateProps) {
-  const { user, isHydrated, isAdmin, isAdminRoleResolved } = useAuth();
+  const { isArabic } = useLanguage();
+  const {
+    user,
+    isHydrated,
+    isAdmin,
+    isAdminRoleResolved,
+    adminRoleCheckNotice,
+    dismissAdminRoleCheckNotice,
+  } = useAuth();
   if (!isHydrated) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -46,8 +55,13 @@ export function VerifiedGate({ children }: VerifiedGateProps) {
   }
   if (!isAdminRoleResolved) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-4">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-red-500" />
+        <p className="max-w-sm text-center text-xs text-slate-500">
+          {isArabic
+            ? "جارٍ التحقق من الصلاحيات… (بحد أقصى 10 ثوانٍ)"
+            : "Checking permissions… (up to 10 seconds)"}
+        </p>
       </div>
     );
   }
@@ -71,5 +85,30 @@ export function VerifiedGate({ children }: VerifiedGateProps) {
       </div>
     );
   }
-  return <>{children}</>;
+  return (
+    <>
+      {adminRoleCheckNotice === "timeout" ? (
+        <div
+          role="status"
+          className="mx-auto mb-4 max-w-3xl rounded-lg border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p>
+              {isArabic
+                ? "انتهت مهلة التحقق من صلاحيات الإدارة (10 ث). تمت المتابعة كمستخدم عادي."
+                : "Admin role check timed out (10s). Proceeding as a regular user."}
+            </p>
+            <button
+              type="button"
+              onClick={() => dismissAdminRoleCheckNotice()}
+              className="shrink-0 rounded border border-amber-700/80 px-2 py-1 text-xs text-amber-50 hover:bg-amber-900/50"
+            >
+              {isArabic ? "إخفاء" : "Dismiss"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {children}
+    </>
+  );
 }

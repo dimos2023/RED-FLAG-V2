@@ -16,6 +16,7 @@ import { useLanguage } from "@/contexts/language-context";
 import { formatSignInError } from "@/lib/format_sign_in_error";
 import { sanitizeInternalNextPath } from "@/lib/safe_next_path";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fetchAppAdminMembershipWithTimeout } from "@/lib/supabase/app_admin_lookup";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -65,6 +66,8 @@ function LoginPageContent() {
         google: "المتابعة بحساب Google",
         googlePending: "جاري التوجيه…",
         googleFail: "تعذر بدء تسجيل الدخول بـ Google.",
+        adminCheckTimeout:
+          "انتهت مهلة التحقق من صلاحيات الإدارة (10 ث). سيتم المتابعة كمستخدم عادي.",
       }
     : {
         title: "Sign in",
@@ -79,6 +82,8 @@ function LoginPageContent() {
         google: "Continue with Google",
         googlePending: "Redirecting…",
         googleFail: "Could not start Google sign-in.",
+        adminCheckTimeout:
+          "Admin role check timed out (10s). Continuing as a regular user.",
       };
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -97,27 +102,13 @@ function LoginPageContent() {
       const uid: string | undefined = userData.user?.id;
       if (uid) {
         let isAppAdmin: boolean = false;
-        try {
-          const { data: adminRow, error: adminError } = await supabase
-            .schema("public")
-            .from("app_admins")
-            .select("user_id")
-            .eq("user_id", uid)
-            .maybeSingle();
-          isAppAdmin = adminError === null && adminRow !== null;
-          if (adminError) {
-            console.warn(
-              "[login] app_admins single-shot select failed; treating as non-admin",
-              adminError.message,
-            );
-          }
-        } catch (err: unknown) {
-          const msg: string = err instanceof Error ? err.message : String(err);
-          console.warn(
-            "[login] app_admins select threw; treating as non-admin",
-            msg,
-          );
-          isAppAdmin = false;
+        const adminOutcome = await fetchAppAdminMembershipWithTimeout(
+          supabase,
+          uid,
+        );
+        isAppAdmin = adminOutcome.isAdmin;
+        if (adminOutcome.timedOut) {
+          setError(copy.adminCheckTimeout);
         }
         const nextSafe: string | null = sanitizeInternalNextPath(
           searchParams.get("next"),

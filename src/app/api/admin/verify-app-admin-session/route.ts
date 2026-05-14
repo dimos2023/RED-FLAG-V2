@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
+import { fetchAppAdminMembershipWithTimeout } from "@/lib/supabase/app_admin_lookup";
 
 /**
  * Verifies the current cookie session against public.app_admins (same RLS as the browser).
@@ -65,30 +66,23 @@ export async function POST(): Promise<NextResponse> {
         ...(isDev ? { debug: { authError: authErr?.message ?? null } } : {}),
       });
     }
-    const { data: adminRow, error: adminErr } = await supabase
-      .schema("public")
-      .from("app_admins")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const outcome = await fetchAppAdminMembershipWithTimeout(supabase, user.id);
+    const hasAdminRow: boolean = outcome.isAdmin;
     console.log("[admin-verify] public.app_admins", {
       queriedUserId: user.id,
-      row: adminRow ?? null,
-      error: adminErr?.message ?? null,
-      code: adminErr?.code ?? null,
+      hasAdminRow,
+      timedOut: outcome.timedOut,
     });
-    const hasAdminRow: boolean = Boolean(adminRow?.user_id) && !adminErr;
     return NextResponse.json({
       ok: true,
       hasAdminRow,
+      adminLookupTimedOut: outcome.timedOut,
       ...(isDev
         ? {
             debug: {
               userId: user.id,
               email: user.email,
-              adminRow: adminRow ?? null,
-              adminError: adminErr?.message ?? null,
-              adminCode: adminErr?.code ?? null,
+              adminLookupTimedOut: outcome.timedOut,
             },
           }
         : {}),

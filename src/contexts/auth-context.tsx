@@ -18,6 +18,7 @@ import {
   upsertProfileFromGoogleUser,
 } from "@/lib/supabase/google_profile_sync";
 import { markProfileVerified } from "@/lib/supabase/profile_registration";
+import { fetchAppAdminMembershipWithTimeout } from "@/lib/supabase/app_admin_lookup";
 import {
   PROFILE_HYDRATE_SELECT_FALLBACK,
   PROFILE_HYDRATE_SELECT_PRIMARY,
@@ -41,6 +42,12 @@ type AuthContextValue = {
   isAdmin: boolean;
   /** Supabase-only: becomes true after `/app_admins` lookup completes for the signed-in user */
   isAdminRoleResolved: boolean;
+  /**
+   * When the `app_admins` lookup hits the wall-clock timeout, UI may show a one-line notice.
+   * `profiles` hydration and registration flows do not depend on this.
+   */
+  adminRoleCheckNotice: "timeout" | null;
+  dismissAdminRoleCheckNotice: () => void;
   isHydrated: boolean;
   /** True when `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set (from env / Vercel). */
   hasSupabase: boolean;
@@ -235,6 +242,9 @@ export function AuthProvider({
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isAdminRoleResolved, setIsAdminRoleResolved] =
     useState<boolean>(false);
+  const [adminRoleCheckNotice, setAdminRoleCheckNotice] = useState<
+    "timeout" | null
+  >(null);
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [profileRefreshNonce, setProfileRefreshNonce] = useState<number>(0);
   const googleProfileSyncedForUserIdRef = useRef<string | null>(null);
@@ -302,50 +312,32 @@ export function AuthProvider({
     if (!supabase) {
       setIsAdmin(false);
       setIsAdminRoleResolved(true);
+      setAdminRoleCheckNotice(null);
       return;
     }
     const userId: string | undefined = supabaseUser?.id;
     if (!userId) {
       setIsAdmin(false);
       setIsAdminRoleResolved(true);
+      setAdminRoleCheckNotice(null);
       return;
     }
     setIsAdmin(false);
     setIsAdminRoleResolved(false);
+    setAdminRoleCheckNotice(null);
     let cancelled: boolean = false;
     void (async (): Promise<void> => {
-      try {
-        const { data, error } = await supabase
-          .schema("public")
-          .from("app_admins")
-          .select("user_id")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (cancelled) {
-          return;
-        }
-        if (error) {
-          console.warn(
-            "[auth] app_admins single-shot select failed; treating user as non-admin",
-            error.message,
-          );
-          setIsAdmin(false);
-          setIsAdminRoleResolved(true);
-          return;
-        }
-        setIsAdmin(data !== null);
-        setIsAdminRoleResolved(true);
-      } catch (err: unknown) {
-        if (cancelled) {
-          return;
-        }
-        const msg: string = err instanceof Error ? err.message : String(err);
-        console.warn(
-          "[auth] app_admins select threw; treating user as non-admin",
-          msg,
-        );
-        setIsAdmin(false);
-        setIsAdminRoleResolved(true);
+      const outcome = await fetchAppAdminMembershipWithTimeout(
+        supabase,
+        userId,
+      );
+      if (cancelled) {
+        return;
+      }
+      setIsAdmin(outcome.isAdmin);
+      setIsAdminRoleResolved(true);
+      if (outcome.timedOut) {
+        setAdminRoleCheckNotice("timeout");
       }
     })();
     return () => {
@@ -353,7 +345,7 @@ export function AuthProvider({
     };
   }, [supabase, supabaseUser?.id]);
 
-  // Profile hydrate: depend on user id only — `supabaseUser` reference changes on token refresh and would re-fetch in a loop.
+  // Profile hydrate runs in a separate effect from admin lookup — no ordering dependency on `app_admins`.
   useEffect(() => {
     if (!supabase || !supabaseUser?.id) {
       return;
@@ -607,6 +599,10 @@ export function AuthProvider({
     [supabase, syncSessionFromSupabase],
   );
 
+  const dismissAdminRoleCheckNotice = useCallback((): void => {
+    setAdminRoleCheckNotice(null);
+  }, []);
+
   const completeVerification = useCallback(
     async (params: {
       accountType: AccountType;
@@ -614,6 +610,7 @@ export function AuthProvider({
       commercialRegistry?: string;
       companyEmail?: string;
     }): Promise<boolean> => {
+      // `markProfileVerified` / `profiles` — independent of `app_admins` membership checks.
       if (!supabase) {
         return false;
       }
@@ -652,6 +649,7 @@ export function AuthProvider({
     setSupabaseUser(null);
     setIsAdmin(false);
     setIsAdminRoleResolved(true);
+    setAdminRoleCheckNotice(null);
     writeStoredProfile(null);
   }, [supabase]);
 
@@ -672,6 +670,8 @@ export function AuthProvider({
       supabaseUser,
       isAdmin,
       isAdminRoleResolved,
+      adminRoleCheckNotice,
+      dismissAdminRoleCheckNotice,
       isHydrated,
       hasSupabase,
       signInWithPassword,
@@ -687,6 +687,8 @@ export function AuthProvider({
       supabaseUser,
       isAdmin,
       isAdminRoleResolved,
+      adminRoleCheckNotice,
+      dismissAdminRoleCheckNotice,
       isHydrated,
       hasSupabase,
       signInWithPassword,
