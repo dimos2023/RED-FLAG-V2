@@ -30,12 +30,24 @@ export async function profileSessionGate(
     return null;
   }
   if (pathname.startsWith("/admin")) {
-    const { data: adm } = await supabase
-      .schema("public")
-      .from("app_admins")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    let adm: { user_id: string } | null = null;
+    try {
+      const { data, error } = await supabase
+        .schema("public")
+        .from("app_admins")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!error && data) {
+        adm = data;
+      }
+    } catch (err: unknown) {
+      const msg: string = err instanceof Error ? err.message : String(err);
+      console.log("[profileSessionGate] app_admins select threw", {
+        userId: user.id,
+        message: msg,
+      });
+    }
     if (!adm) {
       const redirect: NextResponse = NextResponse.redirect(
         new URL("/dashboard?notice=forbidden-admin", request.url),
@@ -52,46 +64,47 @@ export async function profileSessionGate(
     pathname,
     userId: user.id,
   });
-  let rowResponse = await supabase
-    .schema("public")
-    .from("profiles")
-    .select(PROFILE_GATE_SELECT_PRIMARY)
-    .eq("id", user.id)
-    .maybeSingle();
-  if (rowResponse.error) {
-    console.log("[profileSessionGate] primary profiles select failed", {
-      userId: user.id,
-      message: rowResponse.error.message,
-      code: rowResponse.error.code,
-    });
-    rowResponse = await supabase
-      .schema("public")
-      .from("profiles")
-      .select(PROFILE_GATE_SELECT_FALLBACK)
-      .eq("id", user.id)
-      .maybeSingle();
+  type GateRow = Record<string, unknown> | null;
+  let row: GateRow = null;
+  let lastMessage: string | null = null;
+  const selectors: string[] = [
+    PROFILE_GATE_SELECT_PRIMARY,
+    PROFILE_GATE_SELECT_FALLBACK,
+    PROFILE_GATE_SELECT_MINIMAL,
+  ];
+  for (const sel of selectors) {
+    try {
+      const rowResponse = await supabase
+        .schema("public")
+        .from("profiles")
+        .select(sel)
+        .eq("id", user.id)
+        .maybeSingle();
+      if (rowResponse.error) {
+        lastMessage = rowResponse.error.message;
+        console.log("[profileSessionGate] profiles select failed", {
+          userId: user.id,
+          message: rowResponse.error.message,
+          code: rowResponse.error.code,
+        });
+        continue;
+      }
+      row = rowResponse.data as GateRow;
+      break;
+    } catch (err: unknown) {
+      lastMessage = err instanceof Error ? err.message : String(err);
+      console.log("[profileSessionGate] profiles select threw", {
+        userId: user.id,
+        message: lastMessage,
+      });
+    }
   }
-  if (rowResponse.error) {
-    console.log("[profileSessionGate] fallback profiles select failed", {
+  if (row === null && lastMessage !== null) {
+    console.log("[profileSessionGate] all profile gate selects exhausted", {
       userId: user.id,
-      message: rowResponse.error.message,
-      code: rowResponse.error.code,
-    });
-    rowResponse = await supabase
-      .schema("public")
-      .from("profiles")
-      .select(PROFILE_GATE_SELECT_MINIMAL)
-      .eq("id", user.id)
-      .maybeSingle();
-  }
-  if (rowResponse.error) {
-    console.log("[profileSessionGate] minimal profiles select failed", {
-      userId: user.id,
-      message: rowResponse.error.message,
-      code: rowResponse.error.code,
+      message: lastMessage,
     });
   }
-  const row = rowResponse.data;
   const prof: ProfileRowForAccess | null = row as ProfileRowForAccess | null;
   console.log("[profileSessionGate] public.profiles row", {
     userId: user.id,

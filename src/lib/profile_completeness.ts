@@ -41,6 +41,24 @@ function nationalPathsNonEmpty(raw: unknown): boolean {
   return false;
 }
 
+/** When `national_id_number` is not returned by PostgREST (column missing), paths still prove upload. */
+function individualNationalIdRequirementSatisfied(
+  row: ProfileRowForAccess,
+): boolean {
+  const hasPaths: boolean = nationalPathsNonEmpty(row.national_id_storage_path);
+  const columnSelected: boolean = Object.prototype.hasOwnProperty.call(
+    row,
+    "national_id_number",
+  );
+  if (!columnSelected) {
+    return hasPaths;
+  }
+  if (row.national_id_number === null || row.national_id_number === undefined) {
+    return hasPaths;
+  }
+  return nationalIdDigitsCount(row.national_id_number) >= 8;
+}
+
 export function isCompanyProfileRow(row: ProfileRowForAccess): boolean {
   return Boolean(row.company_legal_name?.trim());
 }
@@ -66,8 +84,7 @@ export function isProfileRegistrationComplete(
       row.shipping_line1?.trim() &&
       row.shipping_city?.trim() &&
       row.shipping_country?.trim() &&
-      nationalIdDigitsCount(row.national_id_number) >= 8 &&
-      nationalPathsNonEmpty(row.national_id_storage_path),
+      individualNationalIdRequirementSatisfied(row),
   );
 }
 

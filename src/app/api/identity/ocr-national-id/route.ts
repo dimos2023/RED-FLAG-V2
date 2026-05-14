@@ -85,9 +85,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     nationalIdDigitCount: nationalDigits.length,
     willMatchNationalId: Boolean(expectedNationalForMatch),
   });
-  const buffer: Buffer = Buffer.from(await fileEntry.arrayBuffer());
-  const worker = await createWorker("ara+eng");
+  let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
   try {
+    const buffer: Buffer = Buffer.from(await fileEntry.arrayBuffer());
+    worker = await createWorker("ara+eng");
     const {
       data: { text, confidence },
     } = await worker.recognize(buffer);
@@ -166,11 +167,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.log("[ocr-national-id] worker error", { message: msg });
     return NextResponse.json(
       { ok: false, message: "OCR processing failed. Try again." },
-      { status: 500 },
+      { status: 422 },
     );
   } finally {
-    await worker.terminate().catch(() => {
-      /* ignore */
-    });
+    if (worker !== null) {
+      await worker.terminate().catch(() => {
+        /* ignore */
+      });
+    }
   }
 }

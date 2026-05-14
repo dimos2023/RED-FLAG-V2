@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { insertPublicProfileRowResilient } from "@/lib/supabase/profiles_mutation_resilience";
 
 export function hasGoogleIdentity(user: User): boolean {
   const providers: unknown = user.app_metadata?.providers;
@@ -57,18 +58,15 @@ export async function upsertProfileFromGoogleUser(
   if (updatedRows && updatedRows.length > 0) {
     return { ok: true };
   }
-  const { error: insertErr } = await supabase
-    .schema("public")
-    .from("profiles")
-    .insert({
-      id: user.id,
-      email: user.email ?? null,
-      is_verified: false,
-      verification_status: "pending",
-      full_name: fullName,
-    });
-  if (insertErr) {
-    return { ok: false, message: insertErr.message };
+  const inserted = await insertPublicProfileRowResilient(supabase, {
+    id: user.id,
+    email: user.email ?? null,
+    is_verified: false,
+    verification_status: "pending",
+    full_name: fullName,
+  });
+  if (!inserted.ok) {
+    return { ok: false, message: inserted.message };
   }
   return { ok: true };
 }

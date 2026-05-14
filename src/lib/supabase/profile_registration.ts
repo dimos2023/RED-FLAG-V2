@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  updatePublicProfileRowResilient,
+  upsertPublicProfileRowResilient,
+} from "@/lib/supabase/profiles_mutation_resilience";
 
 const nowIso: () => string = (): string => new Date().toISOString();
 
@@ -80,14 +84,7 @@ export async function upsertRegistrationProfile(
       phone: input.phone.trim(),
       verification_status: "pending",
     };
-    const { error } = await supabase
-      .schema("public")
-      .from("profiles")
-      .upsert(row, { onConflict: "id" });
-    if (error) {
-      return { ok: false, message: error.message };
-    }
-    return { ok: true };
+    return upsertPublicProfileRowResilient(supabase, row);
   }
   const companyNote: string = [
     `CR: ${input.commercialRegistry.trim()}`,
@@ -120,31 +117,16 @@ export async function upsertRegistrationProfile(
     phone: null,
     verification_status: "pending",
   };
-  const { error } = await supabase
-    .schema("public")
-    .from("profiles")
-    .upsert(row, { onConflict: "id" });
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-  return { ok: true };
+  return upsertPublicProfileRowResilient(supabase, row);
 }
 
 export async function markProfileVerified(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { error } = await supabase
-    .schema("public")
-    .from("profiles")
-    .update({
-      is_verified: true,
-      verification_status: "verified",
-      updated_at: nowIso(),
-    })
-    .eq("id", userId);
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-  return { ok: true };
+  return updatePublicProfileRowResilient(supabase, userId, {
+    is_verified: true,
+    verification_status: "verified",
+    updated_at: nowIso(),
+  });
 }

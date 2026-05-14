@@ -19,6 +19,15 @@ export type FraudReportRow = {
   created_at: string;
 };
 
+/**
+ * Client-side profile shape merged from `auth.users` and `public.profiles`.
+ * Maps to table columns (snake_case in DB): id → auth; email → profiles.email;
+ * fullName → full_name; fullLegalName → full_legal_name; phone → phone;
+ * shipping* → shipping_*; company* → company_*; nationalIdStoragePaths →
+ * national_id_storage_path (text[]); nationalIdNumber → national_id_number;
+ * isVerified / verificationStatus → is_verified / verification_status;
+ * hasAcceptedTerms → auth user_metadata only (not a profiles column).
+ */
 export type UserProfile = {
   id: string;
   email: string;
