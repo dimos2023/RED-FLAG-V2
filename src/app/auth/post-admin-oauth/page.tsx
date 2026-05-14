@@ -67,6 +67,10 @@ export default function PostAdminOAuthPage() {
         }
         return;
       }
+      console.log("[post-admin-oauth] session user", {
+        userId: user.id,
+        email: user.email ?? null,
+      });
       if (!isAdminOAuthEmailAllowed(user.email)) {
         const { data: rpcRaw } = await sb.rpc("record_admin_unauthorized_attempt");
         const { permanentlyBlocked } = readStrikeRpcPayload(rpcRaw);
@@ -82,12 +86,39 @@ export default function PostAdminOAuthPage() {
         router.replace("/admin-login?reason=forbidden");
         return;
       }
-      const { data: adminRow, error: adminErr } = await sb
-        .from("app_admins")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (adminErr || !adminRow) {
+      const verifyRes: Response = await fetch(
+        "/api/admin/verify-app-admin-session",
+        { method: "POST", credentials: "same-origin" },
+      );
+      const verifyJson: unknown = await verifyRes.json().catch(() => null);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[post-admin-oauth] verify-app-admin-session response", verifyJson);
+      }
+      if (!verifyRes.ok) {
+        console.warn(
+          "[post-admin-oauth] verify-app-admin-session HTTP",
+          verifyRes.status,
+        );
+      }
+      const hasAdminRow: boolean = Boolean(
+        verifyJson &&
+          typeof verifyJson === "object" &&
+          "hasAdminRow" in verifyJson &&
+          (verifyJson as { hasAdminRow?: boolean }).hasAdminRow === true,
+      );
+      if (!hasAdminRow) {
+        const { data: adminRow, error: adminErr } = await sb
+          .schema("public")
+          .from("app_admins")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        console.log("[post-admin-oauth] client fallback public.app_admins", {
+          userId: user.id,
+          adminRow: adminRow ?? null,
+          adminError: adminErr?.message ?? null,
+          adminCode: adminErr?.code ?? null,
+        });
         await sb.auth.signOut();
         await refreshSessionFromSupabase();
         if (!cancelled) {

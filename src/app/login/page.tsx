@@ -88,6 +88,7 @@ function LoginPageContent() {
       const uid: string | undefined = userData.user?.id;
       if (uid) {
         const { data: adminRow, error: adminError } = await supabase
+          .schema("public")
           .from("app_admins")
           .select("user_id")
           .eq("user_id", uid)

@@ -293,6 +293,7 @@ export function AuthProvider({
     setIsAdminRoleResolved(false);
     let cancelled: boolean = false;
     void supabase
+      .schema("public")
       .from("app_admins")
       .select("user_id")
       .eq("user_id", supabaseUser.id)
