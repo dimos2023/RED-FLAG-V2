@@ -7,14 +7,14 @@ export type ProfileRowForAccess = {
   shipping_line1: string | null;
   shipping_city: string | null;
   shipping_country: string | null;
-  national_id_number: string | null;
+  national_id_number?: string | null;
   national_id_storage_path: unknown;
   company_legal_name: string | null;
   company_address_line1: string | null;
   company_city: string | null;
   company_country: string | null;
   company_location_note: string | null;
-  verification_status: string | null;
+  verification_status?: string | null;
   is_verified: boolean | null;
 };
 

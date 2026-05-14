@@ -7,6 +7,11 @@ import {
   requiresVerifiedProfile,
   type ProfileRowForAccess,
 } from "@/lib/profile_completeness";
+import {
+  PROFILE_GATE_SELECT_FALLBACK,
+  PROFILE_GATE_SELECT_MINIMAL,
+  PROFILE_GATE_SELECT_PRIMARY,
+} from "@/lib/supabase/profile_columns";
 
 function copyCookies(from: NextResponse, to: NextResponse): void {
   from.cookies.getAll().forEach((cookie) => {
@@ -47,14 +52,46 @@ export async function profileSessionGate(
     pathname,
     userId: user.id,
   });
-  const { data: row } = await supabase
+  let rowResponse = await supabase
     .schema("public")
     .from("profiles")
-    .select(
-      "full_name, full_legal_name, phone, shipping_line1, shipping_city, shipping_country, national_id_number, national_id_storage_path, company_legal_name, company_address_line1, company_city, company_country, company_location_note, verification_status, is_verified",
-    )
+    .select(PROFILE_GATE_SELECT_PRIMARY)
     .eq("id", user.id)
     .maybeSingle();
+  if (rowResponse.error) {
+    console.log("[profileSessionGate] primary profiles select failed", {
+      userId: user.id,
+      message: rowResponse.error.message,
+      code: rowResponse.error.code,
+    });
+    rowResponse = await supabase
+      .schema("public")
+      .from("profiles")
+      .select(PROFILE_GATE_SELECT_FALLBACK)
+      .eq("id", user.id)
+      .maybeSingle();
+  }
+  if (rowResponse.error) {
+    console.log("[profileSessionGate] fallback profiles select failed", {
+      userId: user.id,
+      message: rowResponse.error.message,
+      code: rowResponse.error.code,
+    });
+    rowResponse = await supabase
+      .schema("public")
+      .from("profiles")
+      .select(PROFILE_GATE_SELECT_MINIMAL)
+      .eq("id", user.id)
+      .maybeSingle();
+  }
+  if (rowResponse.error) {
+    console.log("[profileSessionGate] minimal profiles select failed", {
+      userId: user.id,
+      message: rowResponse.error.message,
+      code: rowResponse.error.code,
+    });
+  }
+  const row = rowResponse.data;
   const prof: ProfileRowForAccess | null = row as ProfileRowForAccess | null;
   console.log("[profileSessionGate] public.profiles row", {
     userId: user.id,

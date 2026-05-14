@@ -18,6 +18,10 @@ import {
   upsertProfileFromGoogleUser,
 } from "@/lib/supabase/google_profile_sync";
 import { markProfileVerified } from "@/lib/supabase/profile_registration";
+import {
+  PROFILE_HYDRATE_SELECT_FALLBACK,
+  PROFILE_HYDRATE_SELECT_PRIMARY,
+} from "@/lib/supabase/profile_columns";
 import type { AccountType, UserProfile } from "@/types";
 import { TERMS_VERSION } from "@/lib/terms_of_service";
 
@@ -63,7 +67,7 @@ type AuthContextValue = {
 type ProfileRow = {
   email: string | null;
   is_verified: boolean | null;
-  verification_status: string | null;
+  verification_status?: string | null;
   full_name: string | null;
   updated_at: string | null;
   full_legal_name: string | null;
@@ -83,7 +87,7 @@ type ProfileRow = {
   company_country: string | null;
   company_location_note: string | null;
   national_id_storage_path: string[] | string | null;
-  national_id_number: string | null;
+  national_id_number?: string | null;
 };
 
 function parsePrefixedLine(
@@ -329,80 +333,93 @@ export function AuthProvider({
       return;
     }
     let cancelled: boolean = false;
-    void supabase
-      .schema("public")
-      .from("profiles")
-      .select(
-        "email, is_verified, verification_status, full_name, updated_at, full_legal_name, phone, shipping_line1, shipping_line2, shipping_city, shipping_region, shipping_postal_code, shipping_country, company_legal_name, company_address_line1, company_address_line2, company_city, company_region, company_postal_code, company_country, company_location_note, national_id_storage_path, national_id_number",
-      )
-      .eq("id", supabaseUser.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled || error || !data) {
-          return;
+    void (async (): Promise<void> => {
+      let res = await supabase
+        .schema("public")
+        .from("profiles")
+        .select(PROFILE_HYDRATE_SELECT_PRIMARY)
+        .eq("id", supabaseUser.id)
+        .maybeSingle();
+      if (res.error) {
+        console.warn(
+          "[auth] profiles primary select failed, retrying fallback",
+          res.error.message,
+        );
+        res = await supabase
+          .schema("public")
+          .from("profiles")
+          .select(PROFILE_HYDRATE_SELECT_FALLBACK)
+          .eq("id", supabaseUser.id)
+          .maybeSingle();
+      }
+      if (cancelled || res.error || res.data === null) {
+        if (res.error) {
+          console.warn("[auth] profiles select failed", res.error.message);
         }
-        const row: ProfileRow = data as ProfileRow;
-        setUser((prev) => {
-          const fallback: UserProfile =
-            prev ?? buildProfileFromAuthUser(supabaseUser);
-          const note: string | null = row.company_location_note;
-          const crParsed: string | undefined = parsePrefixedLine(note, "CR:");
-          const emailParsed: string | undefined = parsePrefixedLine(
-            note,
-            "Official company email:",
-          );
-          const normPaths: string[] = normalizeNationalPaths(
-            row.national_id_storage_path,
-          );
-          const isCompanyRow: boolean = Boolean(row.company_legal_name?.trim());
-          const next: UserProfile = {
-            ...fallback,
-            isVerified: resolveVerificationStatus(row) === "verified",
-            verificationStatus: resolveVerificationStatus(row),
-            email: row.email?.trim() || fallback.email,
-            fullName: row.full_name ?? fallback.fullName,
-            fullLegalName: row.full_legal_name ?? fallback.fullLegalName,
-            phone: row.phone?.trim() || fallback.phone,
-            shippingLine1: row.shipping_line1 ?? fallback.shippingLine1,
-            shippingLine2: row.shipping_line2 ?? fallback.shippingLine2,
-            shippingCity: row.shipping_city ?? fallback.shippingCity,
-            shippingRegion: row.shipping_region ?? fallback.shippingRegion,
-            shippingPostalCode:
-              row.shipping_postal_code ?? fallback.shippingPostalCode,
-            shippingCountry: row.shipping_country ?? fallback.shippingCountry,
-            companyLegalName:
-              row.company_legal_name ?? fallback.companyLegalName,
-            companyAddressLine1:
-              row.company_address_line1 ?? fallback.companyAddressLine1,
-            companyAddressLine2:
-              row.company_address_line2 ?? fallback.companyAddressLine2,
-            companyCity: row.company_city ?? fallback.companyCity,
-            companyRegion: row.company_region ?? fallback.companyRegion,
-            companyPostalCode:
-              row.company_postal_code ?? fallback.companyPostalCode,
-            companyCountry: row.company_country ?? fallback.companyCountry,
-            companyLocationNote:
-              stripCompanyRegistrationPrefixes(note) ??
-              fallback.companyLocationNote,
-            commercialRegistry: crParsed ?? fallback.commercialRegistry,
-            companyEmail: emailParsed ?? fallback.companyEmail,
-            nationalIdStoragePaths:
-              normPaths.length > 0 ? normPaths : fallback.nationalIdStoragePaths,
-            nationalIdStoragePath:
-              normPaths[0] ?? fallback.nationalIdStoragePath,
-            commercialRegistryStoragePaths: isCompanyRow
-              ? normPaths.length > 0
-                ? normPaths
-                : fallback.commercialRegistryStoragePaths
-              : fallback.commercialRegistryStoragePaths,
-            nationalIdNumber:
-              row.national_id_number?.trim() ||
-              fallback.nationalIdNumber,
-          };
-          writeStoredProfile(next);
-          return next;
-        });
+        return;
+      }
+      const row: ProfileRow = res.data as unknown as ProfileRow;
+      setUser((prev) => {
+        const fallback: UserProfile =
+          prev ?? buildProfileFromAuthUser(supabaseUser);
+        const note: string | null = row.company_location_note;
+        const crParsed: string | undefined = parsePrefixedLine(note, "CR:");
+        const emailParsed: string | undefined = parsePrefixedLine(
+          note,
+          "Official company email:",
+        );
+        const normPaths: string[] = normalizeNationalPaths(
+          row.national_id_storage_path,
+        );
+        const isCompanyRow: boolean = Boolean(row.company_legal_name?.trim());
+        const next: UserProfile = {
+          ...fallback,
+          isVerified: resolveVerificationStatus(row) === "verified",
+          verificationStatus: resolveVerificationStatus(row),
+          email: row.email?.trim() || fallback.email,
+          fullName: row.full_name ?? fallback.fullName,
+          fullLegalName: row.full_legal_name ?? fallback.fullLegalName,
+          phone: row.phone?.trim() || fallback.phone,
+          shippingLine1: row.shipping_line1 ?? fallback.shippingLine1,
+          shippingLine2: row.shipping_line2 ?? fallback.shippingLine2,
+          shippingCity: row.shipping_city ?? fallback.shippingCity,
+          shippingRegion: row.shipping_region ?? fallback.shippingRegion,
+          shippingPostalCode:
+            row.shipping_postal_code ?? fallback.shippingPostalCode,
+          shippingCountry: row.shipping_country ?? fallback.shippingCountry,
+          companyLegalName:
+            row.company_legal_name ?? fallback.companyLegalName,
+          companyAddressLine1:
+            row.company_address_line1 ?? fallback.companyAddressLine1,
+          companyAddressLine2:
+            row.company_address_line2 ?? fallback.companyAddressLine2,
+          companyCity: row.company_city ?? fallback.companyCity,
+          companyRegion: row.company_region ?? fallback.companyRegion,
+          companyPostalCode:
+            row.company_postal_code ?? fallback.companyPostalCode,
+          companyCountry: row.company_country ?? fallback.companyCountry,
+          companyLocationNote:
+            stripCompanyRegistrationPrefixes(note) ??
+            fallback.companyLocationNote,
+          commercialRegistry: crParsed ?? fallback.commercialRegistry,
+          companyEmail: emailParsed ?? fallback.companyEmail,
+          nationalIdStoragePaths:
+            normPaths.length > 0 ? normPaths : fallback.nationalIdStoragePaths,
+          nationalIdStoragePath:
+            normPaths[0] ?? fallback.nationalIdStoragePath,
+          commercialRegistryStoragePaths: isCompanyRow
+            ? normPaths.length > 0
+              ? normPaths
+              : fallback.commercialRegistryStoragePaths
+            : fallback.commercialRegistryStoragePaths,
+          nationalIdNumber:
+            row.national_id_number?.trim() ||
+            fallback.nationalIdNumber,
+        };
+        writeStoredProfile(next);
+        return next;
       });
+    })();
     return () => {
       cancelled = true;
     };
