@@ -7,7 +7,6 @@ const MIN_WIDTH_HEAVY_3D: number = 900;
 export type MediaCapabilities = {
   reducedMotion: boolean;
   allowHeavy3D: boolean;
-  allow3DTransforms: boolean;
 };
 
 export function useMediaCapabilities(): MediaCapabilities {
@@ -33,6 +32,5 @@ export function useMediaCapabilities(): MediaCapabilities {
     };
   }, []);
   const allowHeavy3D: boolean = !reducedMotion && wideEnough;
-  const allow3DTransforms: boolean = !reducedMotion;
-  return { reducedMotion, allowHeavy3D, allow3DTransforms };
+  return { reducedMotion, allowHeavy3D };
 }
