@@ -2,18 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAdminStatus } from "@/hooks/use_admin_status";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 
 export function SiteHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const {
-    user,
-    isAdmin,
-    isAdminRoleResolved,
-    isHydrated,
-    signOut,
-  } = useAuth();
+  const { user, isHydrated, signOut } = useAuth();
+  const { isAdmin, isAdminResolved } = useAdminStatus();
   const { language, isArabic, toggleLanguage } = useLanguage();
   const copy = isArabic
     ? {
@@ -38,7 +34,7 @@ export function SiteHeader() {
         policies: "Policies",
         dashboard: "Dashboard",
         search: "Search",
-        admin: "Admin",
+        admin: "Admin panel",
         report: "Report",
         signOut: "Sign out",
         completeVerification: "Complete verification",
@@ -106,7 +102,7 @@ export function SiteHeader() {
                 {copy.register}
               </Link>
             </>
-          ) : !isAdminRoleResolved ? (
+          ) : !isAdminResolved ? (
             <>
               <span className="h-4 w-28 animate-pulse rounded bg-slate-800" />
               <button
@@ -120,8 +116,7 @@ export function SiteHeader() {
           ) : user.isVerified ? (
             <>
               <Link href="/dashboard" className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200">{copy.dashboard}</Link>
-              <Link href="/search" className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200">{copy.search}</Link>
-              {isAdmin ? (
+              {isAdmin && isAdminResolved ? (
                 <Link
                   href="/admin/requests"
                   className="rounded-lg px-2 py-1 text-amber-400/90 hover:bg-slate-900 hover:text-amber-300"
@@ -129,6 +124,7 @@ export function SiteHeader() {
                   {copy.admin}
                 </Link>
               ) : null}
+              <Link href="/search" className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200">{copy.search}</Link>
               <Link
                 href="/report"
                 className="rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white shadow-lg shadow-red-900/30 hover:bg-red-500"
@@ -143,7 +139,7 @@ export function SiteHeader() {
                 {copy.signOut}
               </button>
             </>
-          ) : isAdmin ? (
+          ) : isAdmin && isAdminResolved ? (
             <>
               <Link
                 href="/admin/requests"
@@ -240,7 +236,7 @@ export function SiteHeader() {
                   {copy.register}
                 </Link>
               </>
-            ) : !isAdminRoleResolved ? (
+            ) : !isAdminResolved ? (
               <>
                 <span className="h-8 w-full animate-pulse rounded-lg bg-slate-800" />
                 <button
@@ -263,14 +259,7 @@ export function SiteHeader() {
                 >
                   {copy.dashboard}
                 </Link>
-                <Link
-                  href="/search"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-slate-100"
-                >
-                  {copy.search}
-                </Link>
-                {isAdmin ? (
+                {isAdmin && isAdminResolved ? (
                   <Link
                     href="/admin/requests"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -279,6 +268,13 @@ export function SiteHeader() {
                     {copy.admin}
                   </Link>
                 ) : null}
+                <Link
+                  href="/search"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+                >
+                  {copy.search}
+                </Link>
                 <Link
                   href="/report"
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -297,7 +293,7 @@ export function SiteHeader() {
                   {copy.signOut}
                 </button>
               </>
-            ) : isAdmin ? (
+            ) : isAdmin && isAdminResolved ? (
               <>
                 <Link
                   href="/admin/requests"

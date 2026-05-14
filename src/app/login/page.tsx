@@ -14,6 +14,7 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 import { formatSignInError } from "@/lib/format_sign_in_error";
+import { sanitizeInternalNextPath } from "@/lib/safe_next_path";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 function LoginPageContent() {
@@ -31,6 +32,14 @@ function LoginPageContent() {
       ? "Mandatory registration required to search or access data."
       : "";
   }, [searchParams]);
+  const forbiddenAdminMessage = useMemo(() => {
+    if (searchParams.get("notice") !== "forbidden-admin") {
+      return "";
+    }
+    return isArabic
+      ? "لا تملك صلاحية الوصول إلى لوحة الإدارة."
+      : "You do not have access to the admin panel.";
+  }, [searchParams, isArabic]);
   const oauthError = useMemo(() => {
     const raw: string | null = searchParams.get("error");
     if (!raw) {
@@ -93,7 +102,26 @@ function LoginPageContent() {
           .select("user_id")
           .eq("user_id", uid)
           .maybeSingle();
-        if (!adminError && adminRow) {
+        const isAppAdmin: boolean = !adminError && adminRow !== null;
+        const nextSafe: string | null = sanitizeInternalNextPath(
+          searchParams.get("next"),
+        );
+        if (nextSafe) {
+          setPending(false);
+          startTransition(() => {
+            if (nextSafe.startsWith("/admin")) {
+              if (isAppAdmin) {
+                router.push(nextSafe);
+              } else {
+                router.push("/dashboard?notice=forbidden-admin");
+              }
+            } else {
+              router.push(nextSafe);
+            }
+          });
+          return;
+        }
+        if (isAppAdmin) {
           setPending(false);
           startTransition(() => {
             router.push("/admin/requests");
@@ -122,6 +150,14 @@ function LoginPageContent() {
         {gateMessage ? (
           <p className="mt-3 rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
             {gateMessage}
+          </p>
+        ) : null}
+        {forbiddenAdminMessage ? (
+          <p
+            className="mt-3 rounded-lg border border-red-900/50 bg-red-950/25 px-3 py-2 text-sm text-red-300"
+            role="status"
+          >
+            {forbiddenAdminMessage}
           </p>
         ) : null}
         {oauthError ? (

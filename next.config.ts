@@ -14,6 +14,11 @@ const nextPublicEnv: Record<string, string> | undefined = supabasePublic
 
 const nextConfig: NextConfig = {
   ...(nextPublicEnv ? { env: nextPublicEnv } : {}),
+  async redirects() {
+    return [
+      { source: "/admin-login", destination: "/login", permanent: false },
+    ];
+  },
   reactStrictMode: true,
   allowedDevOrigins: [
     "http://localhost:3000",

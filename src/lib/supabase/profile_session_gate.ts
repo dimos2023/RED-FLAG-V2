@@ -33,7 +33,7 @@ export async function profileSessionGate(
       .maybeSingle();
     if (!adm) {
       const redirect: NextResponse = NextResponse.redirect(
-        new URL("/admin-login", request.url),
+        new URL("/dashboard?notice=forbidden-admin", request.url),
       );
       copyCookies(baseResponse, redirect);
       return redirect;

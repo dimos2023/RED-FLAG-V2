@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/contexts/auth-context";
+import { sanitizeInternalNextPath } from "@/lib/safe_next_path";
 
 type AdminShellProps = {
   children: ReactNode;
@@ -12,6 +13,7 @@ type AdminShellProps = {
 
 export function AdminShell({ children }: AdminShellProps) {
   const router = useRouter();
+  const pathname: string = usePathname();
   const { user, isAdmin, isAdminRoleResolved, isHydrated, hasSupabase } =
     useAuth();
 
@@ -20,14 +22,18 @@ export function AdminShell({ children }: AdminShellProps) {
       return;
     }
     if (!user) {
-      router.replace("/admin-login");
+      const loginUrl: URL = new URL("/login", window.location.origin);
+      const nextPath: string =
+        sanitizeInternalNextPath(pathname) ?? "/admin/requests";
+      loginUrl.searchParams.set("next", nextPath);
+      router.replace(`${loginUrl.pathname}${loginUrl.search}`);
       return;
     }
     if (!isAdminRoleResolved) {
       return;
     }
     if (!hasSupabase || !isAdmin) {
-      router.replace("/admin-login");
+      router.replace("/dashboard?notice=forbidden-admin");
     }
   }, [
     isHydrated,
@@ -36,6 +42,7 @@ export function AdminShell({ children }: AdminShellProps) {
     isAdminRoleResolved,
     hasSupabase,
     router,
+    pathname,
   ]);
 
   if (!isHydrated || !user || !hasSupabase || !isAdminRoleResolved || !isAdmin) {

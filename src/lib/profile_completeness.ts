@@ -145,7 +145,6 @@ export function isAuthPublicPath(pathname: string): boolean {
     "/api/",
     "/complete-registration",
     "/site-blocked",
-    "/admin-login",
   ];
   if (prefixes.some((p: string) => pathname.startsWith(p))) {
     return true;

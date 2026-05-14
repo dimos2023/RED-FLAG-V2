@@ -1,10 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { VerifiedGate } from "@/components/verified-gate";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
+
+function ForbiddenAdminNotice({ isArabic }: { isArabic: boolean }) {
+  const searchParams = useSearchParams();
+  if (searchParams.get("notice") !== "forbidden-admin") {
+    return null;
+  }
+  return (
+    <p
+      className="mb-6 rounded-lg border border-amber-800/60 bg-amber-950/25 px-4 py-3 text-sm text-amber-100"
+      role="status"
+    >
+      {isArabic
+        ? "لا يمكنك فتح لوحة الإدارة: حسابك ليس ضمن قائمة المشرفين."
+        : "Admin panel is only available to accounts listed in the admin directory."}
+    </p>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -79,6 +98,9 @@ export default function DashboardPage() {
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <VerifiedGate>
+          <Suspense fallback={null}>
+            <ForbiddenAdminNotice isArabic={isArabic} />
+          </Suspense>
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-50">{copy.title}</h1>

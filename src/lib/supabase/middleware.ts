@@ -40,6 +40,18 @@ export async function updateSession(
       data: { user },
     } = await supabase.auth.getUser();
     const path: string = request.nextUrl.pathname;
+    if (path.startsWith("/admin") && !user) {
+      const loginUrl: URL = new URL("/login", request.url);
+      const returnPath: string =
+        path + (request.nextUrl.search ?? "");
+      loginUrl.searchParams.set("next", returnPath);
+      const redirectUnauth: NextResponse =
+        NextResponse.redirect(loginUrl);
+      response.cookies.getAll().forEach((cookie) => {
+        redirectUnauth.cookies.set(cookie.name, cookie.value);
+      });
+      return redirectUnauth;
+    }
     if (
       user?.email &&
       !path.startsWith("/site-blocked") &&
