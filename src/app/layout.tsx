@@ -35,9 +35,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-dvh bg-slate-950 text-slate-300 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-dvh text-slate-300 antialiased`}
         style={{
-          backgroundColor: "#020617",
           color: "#cbd5e1",
           minHeight: "100dvh",
         }}

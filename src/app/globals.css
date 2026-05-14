@@ -20,14 +20,21 @@ html {
 body {
   @apply min-h-dvh text-slate-300 antialiased;
   font-family: var(--font-sans);
+  background-color: #020617;
   background-image:
-    linear-gradient(rgba(2, 6, 23, 0.68), rgba(2, 6, 23, 0.8)),
+    linear-gradient(rgba(2, 6, 23, 0.62), rgba(2, 6, 23, 0.78)),
     url("/site-background.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
   position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    background-attachment: scroll;
+  }
 }
 
 body::before {

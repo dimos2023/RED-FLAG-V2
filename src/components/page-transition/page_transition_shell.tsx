@@ -81,7 +81,7 @@ export function PageTransitionShell({
   );
   const showCanvas: boolean = allowHeavy3D && canvasDeferred && !reducedMotion;
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-slate-950">
+    <div className="relative min-h-dvh overflow-x-hidden bg-transparent">
       {showCanvas ? <TransitionDepthCanvas routeTick={routeTick} /> : null}
       <div className="relative z-10 min-h-dvh">
         <AnimatePresence mode="wait" initial={false}>
