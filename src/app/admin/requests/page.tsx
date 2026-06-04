@@ -25,6 +25,7 @@ export default function AdminRequestsPage() {
     setLoading(true);
     setError("");
     let query = supabase
+      .schema("public")
       .from("reports")
       .select(
         "id, owner_id, subject_name, subject_phone, subject_cr, subject_address, review_status, reviewed_by, reviewed_at, admin_note, logo_storage_path, created_at",
@@ -58,6 +59,7 @@ export default function AdminRequestsPage() {
       return;
     }
     const { error: uErr } = await supabase
+      .schema("public")
       .from("reports")
       .update({
         review_status: next,

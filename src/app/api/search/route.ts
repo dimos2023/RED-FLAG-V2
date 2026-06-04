@@ -78,6 +78,7 @@ export async function POST(request: Request) {
   ].join(",");
 
   const { data: reportRows, error: reportsError } = await adminClient
+    .schema("public")
     .from("reports")
     .select(
       "id, subject_name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status",

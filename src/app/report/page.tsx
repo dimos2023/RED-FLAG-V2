@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { VerifiedGate } from "@/components/verified-gate";
 import { useLanguage } from "@/contexts/language-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { insertPublicReportRow, updateReportLogoPath } from "@/lib/supabase/reports_mutation";
 import { uploadFraudEvidence } from "@/lib/supabase/storage";
 
 type ReportStep = 1 | 2 | 3;
@@ -70,28 +71,22 @@ export default function ReportPage() {
       return;
     }
     const ownerId: string = authData.user.id;
-    const { data: reportRow, error: insertErr } = await sb
-      .from("reports")
-      .insert({
-        owner_id: ownerId,
-        subject_name: subjectName,
-        subject_phone: subjectPhone.trim() || null,
-        subject_cr: subjectCr.trim() || null,
-        subject_address: subjectAddress,
-        review_status: "pending",
-      })
-      .select("id")
-      .single();
-    if (insertErr || !reportRow) {
+    const inserted = await insertPublicReportRow(sb, {
+      ownerId,
+      subjectName,
+      subjectPhone: subjectPhone.trim() || null,
+      subjectCr: subjectCr.trim() || null,
+      subjectAddress,
+    });
+    if (!inserted.ok) {
       setVaultSummary(
-        insertErr?.message ??
-          "Could not create report row. Run the latest SQL migrations in Supabase.",
+        `${inserted.message} Apply migration supabase/migrations/20260520120000_reports_subject_address_and_columns.sql in the Supabase SQL editor if needed.`,
       );
       setSubmitting(false);
       setSubmitted(true);
       return;
     }
-    const reportId: string = reportRow.id as string;
+    const reportId: string = inserted.id;
     const folder: string = `reports/${reportId}`;
     const messages: string[] = [`Report #${reportId.slice(0, 8)}… saved as pending review.`];
     if (logoFile) {
@@ -100,12 +95,9 @@ export default function ReportPage() {
         reportFolder: folder,
       });
       if (logoRes.ok) {
-        const { error: logoUpdErr } = await sb
-          .from("reports")
-          .update({ logo_storage_path: logoRes.path })
-          .eq("id", reportId);
-        if (logoUpdErr) {
-          messages.push(`Logo uploaded but DB update failed: ${logoUpdErr.message}`);
+        const logoDb = await updateReportLogoPath(sb, reportId, logoRes.path);
+        if (!logoDb.ok) {
+          messages.push(`Logo uploaded but DB update failed: ${logoDb.message}`);
         } else {
           messages.push("Logo stored privately.");
         }
@@ -124,7 +116,7 @@ export default function ReportPage() {
         uploadErrors.push(res.message);
         continue;
       }
-      const { error: evErr } = await sb.from("evidence_objects").insert({
+      const { error: evErr } = await sb.schema("public").from("evidence_objects").insert({
         report_id: reportId,
         owner_id: ownerId,
         storage_path: res.path,
