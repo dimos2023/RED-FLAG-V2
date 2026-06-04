@@ -98,13 +98,14 @@ export async function profileSessionGate(
     });
   }
   const prof: ProfileRowForAccess | null = row as ProfileRowForAccess | null;
+  const gateOptions = { authUser: user };
   console.log("[profileSessionGate] public.profiles row", {
     userId: user.id,
     hasRow: Boolean(prof),
     verificationStatus: prof?.verification_status ?? null,
-    registrationComplete: isProfileRegistrationComplete(prof),
+    registrationComplete: isProfileRegistrationComplete(prof, gateOptions),
   });
-  if (!isProfileRegistrationComplete(prof)) {
+  if (!isProfileRegistrationComplete(prof, gateOptions)) {
     console.log("[profileSessionGate] redirect incomplete → /complete-registration", {
       userId: user.id,
       pathname,

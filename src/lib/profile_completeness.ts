@@ -1,4 +1,11 @@
+import type { User } from "@supabase/supabase-js";
+import { hasGoogleIdentity } from "@/lib/supabase/google_profile_sync";
+import { isGoogleIdentityVerifiedInAuth } from "@/lib/supabase/google_oauth_onboarding";
 import type { UserProfile } from "@/types";
+
+export type ProfileCompletenessOptions = {
+  authUser?: User | null;
+};
 
 export type ProfileRowForAccess = {
   full_name: string | null;
@@ -63,9 +70,33 @@ export function isCompanyProfileRow(row: ProfileRowForAccess): boolean {
   return Boolean(row.company_legal_name?.trim());
 }
 
-export function isProfileRegistrationComplete(
+/** Google OAuth users verified via `completeGoogleOAuthRegistration` (no manual ID upload). */
+export function isGoogleTrustedRegistrationComplete(
+  authUser: User | null | undefined,
   row: ProfileRowForAccess | null,
 ): boolean {
+  if (!authUser || !hasGoogleIdentity(authUser)) {
+    return false;
+  }
+  if (!isGoogleIdentityVerifiedInAuth(authUser)) {
+    return false;
+  }
+  if (!row) {
+    return false;
+  }
+  if (isCompanyProfileRow(row)) {
+    return false;
+  }
+  return Boolean(row.full_legal_name?.trim() || row.full_name?.trim());
+}
+
+export function isProfileRegistrationComplete(
+  row: ProfileRowForAccess | null,
+  options?: ProfileCompletenessOptions,
+): boolean {
+  if (options?.authUser && isGoogleTrustedRegistrationComplete(options.authUser, row)) {
+    return true;
+  }
   if (!row) {
     return false;
   }
@@ -135,10 +166,20 @@ export function profileRowFromUserProfile(
   };
 }
 
-export function userProfileAllowsVerifiedAccess(user: {
-  verificationStatus?: "pending" | "verified" | "rejected";
-  isVerified?: boolean;
-}): boolean {
+export function userProfileAllowsVerifiedAccess(
+  user: {
+    verificationStatus?: "pending" | "verified" | "rejected";
+    isVerified?: boolean;
+    googleIdentityVerified?: boolean;
+  },
+  authUser?: User | null,
+): boolean {
+  if (authUser && isGoogleIdentityVerifiedInAuth(authUser)) {
+    return true;
+  }
+  if (user.googleIdentityVerified === true) {
+    return true;
+  }
   if (user.verificationStatus === "verified") {
     return true;
   }

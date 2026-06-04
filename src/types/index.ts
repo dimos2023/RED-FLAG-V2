@@ -59,4 +59,6 @@ export type UserProfile = {
   /** National ID number as entered by the user (digits); used with OCR cross-check. */
   nationalIdNumber?: string;
   commercialRegistryStoragePaths?: string[];
+  /** Set when the account completed Google OAuth onboarding (no manual ID form). */
+  googleIdentityVerified?: boolean;
 };

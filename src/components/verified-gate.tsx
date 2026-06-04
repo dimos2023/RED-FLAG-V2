@@ -14,6 +14,7 @@ export function VerifiedGate({ children }: VerifiedGateProps) {
   const { isArabic } = useLanguage();
   const {
     user,
+    supabaseUser,
     isHydrated,
     isAdmin,
     isAdminRoleResolved,
@@ -65,7 +66,7 @@ export function VerifiedGate({ children }: VerifiedGateProps) {
       </div>
     );
   }
-  if (!userProfileAllowsVerifiedAccess(user) && !isAdmin) {
+  if (!userProfileAllowsVerifiedAccess(user, supabaseUser) && !isAdmin) {
     return (
       <div className="mx-auto max-w-lg rounded-2xl border border-amber-900/50 bg-amber-950/20 p-8 text-center">
         <h2 className="text-lg font-semibold text-amber-200">

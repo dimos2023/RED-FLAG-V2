@@ -21,6 +21,11 @@ import {
 } from "@/lib/profile_completeness";
 import { requestNationalIdOcrGate } from "@/lib/register/ocr_gate";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { hasGoogleIdentity } from "@/lib/supabase/google_profile_sync";
+import {
+  completeGoogleOAuthRegistration,
+  extractGoogleRegistrationSeed,
+} from "@/lib/supabase/google_oauth_onboarding";
 import { resolveGoogleDisplayName } from "@/lib/supabase/google_profile_sync";
 import { upsertRegistrationProfile } from "@/lib/supabase/profile_registration";
 import { uploadFraudEvidence } from "@/lib/supabase/storage";
@@ -48,6 +53,10 @@ function CompleteRegistrationInner() {
   const completeRegUserIdRef = useRef<string | undefined>(undefined);
   /** Prevents profile refresh from overwriting fields the user is editing (OCR / submit). */
   const formSeededForUserIdRef = useRef<string | undefined>(undefined);
+  const googleBootstrapAttemptedRef = useRef<boolean>(false);
+  const [googleSyncPending, setGoogleSyncPending] = useState<boolean>(false);
+  const isGoogleUser: boolean =
+    supabaseUser !== null && hasGoogleIdentity(supabaseUser);
   const copy = useMemo(() => {
     if (isArabic) {
       return {
@@ -73,6 +82,9 @@ function CompleteRegistrationInner() {
         loading: "جاري المعالجة…",
         backDashboard: "العودة للرئيسية",
         rejected: "تم رفض التحقق من حسابك. راجع البيانات أو تواصل مع الدعم.",
+        googlePrefill:
+          "تم تعبئة الاسم والبريد من حساب Google. أكمل الحقول المتبقية إن لزم.",
+        googleSyncing: "جاري إكمال التسجيل من بيانات Google…",
       };
     }
     return {
@@ -99,6 +111,9 @@ function CompleteRegistrationInner() {
       backDashboard: "Back to home",
       rejected:
         "Your verification was rejected. Update your details or contact support.",
+      googlePrefill:
+        "Name and email were filled from your Google account. Complete any remaining fields if needed.",
+      googleSyncing: "Completing registration from your Google account…",
     };
   }, [isArabic]);
   useEffect(() => {
@@ -112,26 +127,62 @@ function CompleteRegistrationInner() {
     }
   }, [user?.id]);
   useEffect(() => {
-    if (pending) {
+    if (pending || !user?.id || !supabaseUser) {
       return;
     }
-    if (!user?.id) {
-      return;
-    }
+    const seed = extractGoogleRegistrationSeed(supabaseUser);
     if (formSeededForUserIdRef.current === user.id) {
+      if (isGoogleUser && !fullLegalName.trim() && seed.fullLegalName) {
+        setFullLegalName(seed.fullLegalName);
+      }
       return;
     }
     formSeededForUserIdRef.current = user.id;
-    setFullLegalName(user.fullLegalName ?? user.fullName ?? "");
-    setPhone(user.phone ?? "");
+    setFullLegalName(
+      user.fullLegalName ?? user.fullName ?? seed.fullLegalName ?? "",
+    );
+    setPhone(user.phone ?? seed.phoneHint ?? "");
     setShippingLine1(user.shippingLine1 ?? "");
     setShippingLine2(user.shippingLine2 ?? "");
     setShippingCity(user.shippingCity ?? "");
     setShippingRegion(user.shippingRegion ?? "");
     setShippingPostalCode(user.shippingPostalCode ?? "");
-    setShippingCountry(user.shippingCountry ?? "");
+    setShippingCountry(user.shippingCountry ?? seed.countryHint ?? "");
     setNationalIdNumber(user.nationalIdNumber ?? "");
-  }, [user, pending]);
+  }, [user, supabaseUser, pending, isGoogleUser]);
+  useEffect(() => {
+    if (!supabaseUser || !user?.id || !isGoogleUser) {
+      return;
+    }
+    if (user.googleIdentityVerified) {
+      return;
+    }
+    if (googleBootstrapAttemptedRef.current) {
+      return;
+    }
+    const sb = createSupabaseBrowserClient();
+    if (!sb) {
+      return;
+    }
+    googleBootstrapAttemptedRef.current = true;
+    setGoogleSyncPending(true);
+    void (async (): Promise<void> => {
+      const result = await completeGoogleOAuthRegistration(sb, supabaseUser);
+      setGoogleSyncPending(false);
+      if (!result.ok) {
+        googleBootstrapAttemptedRef.current = false;
+        setError(result.message);
+        return;
+      }
+      await refreshSessionFromSupabase();
+    })();
+  }, [
+    supabaseUser,
+    user?.id,
+    user?.googleIdentityVerified,
+    isGoogleUser,
+    refreshSessionFromSupabase,
+  ]);
   useEffect(() => {
     if (!user) {
       return;
@@ -140,15 +191,22 @@ function CompleteRegistrationInner() {
       return;
     }
     const row = profileRowFromUserProfile(user);
-    if (isProfileRegistrationComplete(row) && isVerificationApproved(row)) {
+    const gateOptions = { authUser: supabaseUser };
+    if (
+      isProfileRegistrationComplete(row, gateOptions) &&
+      isVerificationApproved(row)
+    ) {
       verifiedAutoRedirectRef.current = true;
       void router.replace("/dashboard");
     }
-  }, [user, router]);
-  if (!isHydrated) {
+  }, [user, supabaseUser, router]);
+  if (!isHydrated || (isGoogleUser && googleSyncPending)) {
     return (
-      <div className="flex min-h-dvh items-center justify-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-700 border-t-red-500" />
+        {isGoogleUser ? (
+          <p className="text-sm text-slate-400">{copy.googleSyncing}</p>
+        ) : null}
       </div>
     );
   }
@@ -187,7 +245,11 @@ function CompleteRegistrationInner() {
     );
   }
   const accessRow = profileRowFromUserProfile(user);
-  const complete: boolean = isProfileRegistrationComplete(accessRow);
+  const gateOptions = { authUser: supabaseUser };
+  const complete: boolean = isProfileRegistrationComplete(
+    accessRow,
+    gateOptions,
+  );
   const approved: boolean = isVerificationApproved(accessRow);
   const vStatus: string | null | undefined =
     accessRow?.verification_status ?? user.verificationStatus ?? null;
@@ -331,7 +393,12 @@ function CompleteRegistrationInner() {
       <SiteHeader />
       <main className="mx-auto max-w-lg px-4 py-16">
         <h1 className="text-2xl font-bold text-slate-50">{copy.title}</h1>
-        {reason === "incomplete" ? (
+        {isGoogleUser && !user.googleIdentityVerified ? (
+          <p className="mt-2 rounded-lg border border-sky-900/50 bg-sky-950/30 px-3 py-2 text-sm text-sky-200">
+            {copy.googlePrefill}
+          </p>
+        ) : null}
+        {reason === "incomplete" && !user.googleIdentityVerified ? (
           <p className="mt-2 text-sm text-slate-400">
             {isArabic
               ? "أكمل الحقول التالية وارفع صورة الهوية لتفعيل الوصول."

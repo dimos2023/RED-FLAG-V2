@@ -13,10 +13,12 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { setSupabasePublicEnvOverride } from "@/lib/supabase/env";
+import { hasGoogleIdentity } from "@/lib/supabase/google_profile_sync";
+import { completeGoogleOAuthRegistration } from "@/lib/supabase/google_oauth_onboarding";
 import {
-  hasGoogleIdentity,
-  upsertProfileFromGoogleUser,
-} from "@/lib/supabase/google_profile_sync";
+  extractGoogleRegistrationSeed,
+} from "@/lib/supabase/google_oauth_onboarding";
+import { resolveGoogleDisplayName } from "@/lib/supabase/google_profile_sync";
 import { markProfileVerified } from "@/lib/supabase/profile_registration";
 import { fetchAppAdminMembershipWithTimeout } from "@/lib/supabase/app_admin_lookup";
 import {
@@ -196,12 +198,24 @@ function buildProfileFromAuthUser(u: User): UserProfile {
     u.user_metadata as Record<string, unknown> | undefined;
   const accountType: AccountType =
     meta?.account_type === "company" ? "company" : "individual";
+  const googleName: string | undefined =
+    resolveGoogleDisplayName(u) ?? undefined;
+  const googleVerified: boolean = meta?.google_identity_verified === true;
   return {
     id: u.id,
     email: u.email ?? "",
     accountType,
-    hasAcceptedTerms: Boolean(meta?.terms_version === TERMS_VERSION),
-    isVerified: Boolean(meta?.is_verified),
+    hasAcceptedTerms:
+      Boolean(meta?.terms_version === TERMS_VERSION) || googleVerified,
+    isVerified: Boolean(meta?.is_verified) || googleVerified,
+    verificationStatus: googleVerified
+      ? "verified"
+      : meta?.is_verified === true
+        ? "verified"
+        : undefined,
+    fullName: googleName,
+    fullLegalName: googleName,
+    googleIdentityVerified: googleVerified,
     phone: typeof meta?.phone === "string" ? meta.phone : undefined,
     commercialRegistry:
       typeof meta?.commercial_registry === "string"
@@ -436,6 +450,10 @@ export function AuthProvider({
             nationalIdNumber:
               row.national_id_number?.trim() ||
               fallback.nationalIdNumber,
+            googleIdentityVerified:
+              fallback.googleIdentityVerified ??
+              (resolveVerificationStatus(row) === "verified" &&
+                hasGoogleIdentity(authSnapshot)),
           };
           writeStoredProfile(next);
           return next;
@@ -468,20 +486,46 @@ export function AuthProvider({
     }
     googleProfileSyncedForUserIdRef.current = googleUser.id;
     let cancelled: boolean = false;
-    void upsertProfileFromGoogleUser(supabase, googleUser).then((result) => {
-      if (cancelled) {
-        return;
-      }
-      if (!result.ok) {
-        googleProfileSyncedForUserIdRef.current = null;
-        return;
-      }
-      setProfileRefreshNonce((n: number) => n + 1);
-    });
+    void completeGoogleOAuthRegistration(supabase, googleUser).then(
+      async (result) => {
+        if (cancelled) {
+          return;
+        }
+        if (!result.ok) {
+          googleProfileSyncedForUserIdRef.current = null;
+          console.warn("[auth] Google OAuth onboarding failed", result.message);
+          return;
+        }
+        await syncSessionFromSupabase();
+        if (cancelled) {
+          return;
+        }
+        const seed = extractGoogleRegistrationSeed(googleUser);
+        setUser((prev) => {
+          const base: UserProfile =
+            prev ?? buildProfileFromAuthUser(googleUser);
+          const next: UserProfile = {
+            ...base,
+            email: seed.email || base.email,
+            fullName: seed.fullLegalName,
+            fullLegalName: seed.fullLegalName,
+            phone: seed.phoneHint ?? base.phone,
+            shippingCountry: seed.countryHint ?? base.shippingCountry,
+            hasAcceptedTerms: true,
+            isVerified: true,
+            verificationStatus: "verified",
+            googleIdentityVerified: true,
+          };
+          writeStoredProfile(next);
+          return next;
+        });
+        setProfileRefreshNonce((n: number) => n + 1);
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [supabase, supabaseUser?.id]);
+  }, [supabase, supabaseUser?.id, syncSessionFromSupabase]);
 
   const signInWithGoogle = useCallback(
     async (options?: { nextPath?: string }): Promise<SignInResult> => {
