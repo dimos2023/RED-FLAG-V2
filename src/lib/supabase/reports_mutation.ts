@@ -101,18 +101,34 @@ export async function insertPublicReportRow(
   };
 }
 
+export type UpdateReportLogoPathResult =
+  | { ok: true; skipped: true }
+  | { ok: true; skipped: false }
+  | { ok: false; message: string };
+
+/**
+ * Optional report logo — no-op when path is missing (user skipped step 2 media).
+ */
 export async function updateReportLogoPath(
   supabase: SupabaseClient,
   reportId: string,
-  logoStoragePath: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+  logoStoragePath: string | null | undefined,
+): Promise<UpdateReportLogoPathResult> {
+  const reportIdTrimmed: string = reportId.trim();
+  if (reportIdTrimmed.length === 0) {
+    return { ok: false, message: "Report id is required." };
+  }
+  const path: string | undefined = logoStoragePath?.trim();
+  if (!path) {
+    return { ok: true, skipped: true };
+  }
   const { error } = await supabase
     .schema("public")
     .from("reports")
-    .update({ logo_storage_path: logoStoragePath })
-    .eq("id", reportId);
+    .update({ logo_storage_path: path })
+    .eq("id", reportIdTrimmed);
   if (error) {
     return { ok: false, message: error.message };
   }
-  return { ok: true };
+  return { ok: true, skipped: false };
 }

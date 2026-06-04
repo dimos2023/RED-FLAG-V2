@@ -6,7 +6,10 @@ import { VerifiedGate } from "@/components/verified-gate";
 import { useLanguage } from "@/contexts/language-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { insertPublicReportRow, updateReportLogoPath } from "@/lib/supabase/reports_mutation";
-import { uploadFraudEvidence } from "@/lib/supabase/storage";
+import {
+  isValidEvidenceFile,
+  uploadFraudEvidence,
+} from "@/lib/supabase/storage";
 
 type ReportStep = 1 | 2 | 3;
 
@@ -89,25 +92,26 @@ export default function ReportPage() {
     const reportId: string = inserted.id;
     const folder: string = `reports/${reportId}`;
     const messages: string[] = [`Report #${reportId.slice(0, 8)}… saved as pending review.`];
-    if (logoFile) {
+    if (isValidEvidenceFile(logoFile)) {
       const logoRes = await uploadFraudEvidence(sb, ownerId, {
         file: logoFile,
         reportFolder: folder,
       });
-      if (logoRes.ok) {
+      if (!logoRes.ok) {
+        messages.push(`Logo upload skipped: ${logoRes.message}`);
+      } else {
         const logoDb = await updateReportLogoPath(sb, reportId, logoRes.path);
         if (!logoDb.ok) {
           messages.push(`Logo uploaded but DB update failed: ${logoDb.message}`);
-        } else {
+        } else if (!logoDb.skipped) {
           messages.push("Logo stored privately.");
         }
-      } else {
-        messages.push(`Logo upload skipped: ${logoRes.message}`);
       }
     }
+    const evidenceToUpload: File[] = evidenceFiles.filter(isValidEvidenceFile);
     let uploaded: number = 0;
     const uploadErrors: string[] = [];
-    for (const file of evidenceFiles) {
+    for (const file of evidenceToUpload) {
       const res = await uploadFraudEvidence(sb, ownerId, {
         file,
         reportFolder: folder,
@@ -128,9 +132,9 @@ export default function ReportPage() {
         uploaded += 1;
       }
     }
-    if (evidenceFiles.length > 0) {
+    if (evidenceToUpload.length > 0) {
       messages.push(
-        `Evidence files registered: ${String(uploaded)}/${String(evidenceFiles.length)}.`,
+        `Evidence files registered: ${String(uploaded)}/${String(evidenceToUpload.length)}.`,
       );
     } else {
       messages.push("No evidence files attached.");
@@ -250,7 +254,12 @@ export default function ReportPage() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const picked: File | undefined = e.target.files?.[0];
+                  setLogoFile(
+                    isValidEvidenceFile(picked) ? picked : null,
+                  );
+                }}
                 className="w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-slate-200"
               />
               <div className="flex gap-2">
@@ -283,14 +292,18 @@ export default function ReportPage() {
                 accept="image/*,.pdf"
                 multiple
                 onChange={(e) =>
-                  setEvidenceFiles(Array.from(e.target.files ?? []))
+                  setEvidenceFiles(
+                    Array.from(e.target.files ?? []).filter(
+                      isValidEvidenceFile,
+                    ),
+                  )
                 }
                 className="w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-slate-200"
               />
               {evidenceFiles.length > 0 ? (
                 <ul className="text-xs text-slate-500">
-                  {evidenceFiles.map((f) => (
-                    <li key={f.name}>{f.name}</li>
+                  {evidenceFiles.map((f: File, index: number) => (
+                    <li key={`${f.name}-${String(index)}`}>{f.name}</li>
                   ))}
                 </ul>
               ) : null}
