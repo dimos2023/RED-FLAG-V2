@@ -1,93 +1,181 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { motion } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useLanguage } from "@/contexts/language-context";
 
+const EarthBackground = dynamic(
+  () => import("@/components/earth-background").then((mod) => mod.EarthBackground),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
+
+type CardSection = {
+  title: string;
+  description: string;
+  icon: string;
+};
+
+function GlassmorphicCard({
+  section,
+  index,
+  isArabic,
+}: {
+  section: CardSection;
+  index: number;
+  isArabic: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+
+    const rect = ref.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const x = ((e.clientX - rect.left - centerX) / centerX) * 15;
+    const y = ((e.clientY - rect.top - centerY) / centerY) * -15;
+
+    setRotateX(y);
+    setRotateY(x);
+  };
+
+  const handleMouseLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: index * 0.1 }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        perspective: "1000px",
+        transformStyle: "preserve-3d",
+        transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+        transition: "transform 0.1s ease-out",
+      }}
+      className="h-full"
+    >
+      <div className="relative h-full rounded-2xl border border-slate-700/50 bg-slate-900/40 backdrop-blur-md p-8 shadow-2xl overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-600/10 via-transparent to-slate-950/30 pointer-events-none" />
+
+        <div className="relative z-10">
+          <div className="text-4xl mb-4">{section.icon}</div>
+          <h3 className={`text-xl font-bold text-slate-50 mb-4 ${isArabic ? "text-right" : ""}`}>
+            {section.title}
+          </h3>
+          <p className={`text-sm leading-relaxed text-slate-300 ${isArabic ? "text-right" : ""}`}>
+            {section.description}
+          </p>
+        </div>
+
+        <div className="absolute inset-0 rounded-2xl border border-slate-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      </div>
+    </motion.div>
+  );
+}
+
 export default function AboutPage() {
   const { isArabic } = useLanguage();
+
   const copy = isArabic
     ? {
-        title: "عن Red-Flag",
-        intro:
-          "Red-Flag منصة احترافية للإبلاغ عن الاحتيال والتحقق تهدف إلى خفض مخاطر الثقة ورفع جودة الفحص المسبق وخلق بيئة رقمية وتجارية أكثر أمانًا.",
-        why: "لماذا وُجدت المنصة",
-        whyItems: [
-          "مساعدة المستخدمين على اكتشاف الكيانات المشبوهة قبل إتمام المعاملات.",
-          "تجميع إشارات الاحتيال بشكل منظم ضمن سير عمل موثوق.",
-          "حفظ الإطار القانوني عبر مسؤولية واضحة للرافع ودور استضافة فقط.",
-          "توفير إدارة أدلة آمنة مع كشف منضبط ومدفوع.",
-        ],
-        flow: "ماذا تقدم Red-Flag من البداية للنهاية",
-        flowItems: [
-          "1. إلزامية التحقق للأفراد والشركات قبل الوصول.",
-          "2. استقبال البلاغات عبر نموذج متعدد الخطوات.",
-          "3. تخزين الأدلة في خزنة خاصة محمية.",
-          "4. إظهار نتائج بحث غير حساسة للمستخدمين الموثقين فقط.",
-          "5. تفعيل مسار طلب/دفع قبل مراجعة الأدلة.",
-          "6. دعم مراجعة إدارية للموافقة أو الرفض مع سياق تدقيقي.",
-        ],
-        impact: "الأثر والقيمة",
-        impactBody:
-          "المنصة مصممة لتقليل التعرض للاحتيال، وزيادة الثقة في القرار، وتحويل فحص المخاطر إلى عملية قابلة للتكرار مع احترام الخصوصية والامتثال.",
+        title: "من نحن - منصة Red-Flag",
+        subtitle:
+          "منظومة تقنية أمنية متكاملة تهدف إلى مكافحة الاحتيال الرقمي، وتوثيق البلاغات، وحماية الهوية الرقمية للشركات والأفراد عبر بيئة رقمية مشفرة وشفافة.",
+        visionTitle: "رؤيتنا",
+        visionDesc:
+          "ريادة الفضاء الرقمي في مكافحة الجرائم الإلكترونية وتوفير بيئة تصفح ومعاملات آمنة وخالية من التهديدات في الشرق الأوسط.",
+        visionIcon: "🌍",
+        missionTitle: "رسالتنا",
+        missionDesc:
+          "تمكين الأفراد والشركات من الإبلاغ عن الأنشطة المشبوهة والتحقق من الهويات التجارية فوراً، مستعينين بأحدث تقنيات الذكاء الاصطناعي والأدلة الرقمية المعززة.",
+        missionIcon: "🎯",
+        valuesTitle: "قيمنا الأساسية",
+        valuesDesc:
+          "الشفافية والأمان والابتكار والمسؤولية الاجتماعية في بناء منصة موثوقة تحافظ على سلامة البيئة الرقمية والتجارية.",
+        valuesIcon: "⚡",
       }
     : {
         title: "About Red-Flag",
-        intro:
-          "Red-Flag is a professional fraud reporting and verification platform built to reduce trust risk, improve due diligence, and create a safer digital and commercial environment for individuals and companies.",
-        why: "Why this platform exists",
-        whyItems: [
-          "To help users identify suspicious entities before transactions happen.",
-          "To centralize structured fraud signals in one trusted workflow.",
-          "To preserve legal boundaries with clear uploader liability and hosting-only role.",
-          "To provide secure evidence management with controlled, paid disclosure.",
-        ],
-        flow: "What Red-Flag does end-to-end",
-        flowItems: [
-          "1. Enforces verified onboarding (individual or company) before access.",
-          "2. Collects fraud reports through a guided multi-step submission flow.",
-          "3. Stores supporting documents privately in a protected evidence vault.",
-          "4. Exposes non-sensitive registry search results to verified users only.",
-          "5. Uses a request-and-pay workflow before any evidence review.",
-          "6. Supports admin moderation to approve/reject report requests with audit context.",
-        ],
-        impact: "Impact and value",
-        impactBody:
-          "The platform is designed to cut fraud exposure, increase decision confidence, and formalize risk screening as a repeatable process. It is built for serious users who need stronger trust signals without violating privacy, legal, or compliance boundaries.",
+        subtitle:
+          "An integrated security technology system designed to combat digital fraud, document reports, and protect the digital identity of companies and individuals through a secure, transparent digital environment.",
+        visionTitle: "Our Vision",
+        visionDesc:
+          "Lead the digital space in combating cyber crimes and providing a safe, threat-free browsing and transaction environment in the Middle East.",
+        visionIcon: "🌍",
+        missionTitle: "Our Mission",
+        missionDesc:
+          "Empower individuals and companies to report suspicious activities and verify commercial identities instantly, leveraging cutting-edge AI and enhanced digital evidence.",
+        missionIcon: "🎯",
+        valuesTitle: "Core Values",
+        valuesDesc:
+          "Transparency, security, innovation, and social responsibility in building a trusted platform that preserves the integrity of digital and commercial environments.",
+        valuesIcon: "⚡",
       };
 
+  const sections: CardSection[] = [
+    {
+      title: copy.visionTitle,
+      description: copy.visionDesc,
+      icon: copy.visionIcon,
+    },
+    {
+      title: copy.missionTitle,
+      description: copy.missionDesc,
+      icon: copy.missionIcon,
+    },
+    {
+      title: copy.valuesTitle,
+      description: copy.valuesDesc,
+      icon: copy.valuesIcon,
+    },
+  ];
+
   return (
-    <div className="min-h-dvh bg-transparent">
+    <div
+      className="min-h-dvh bg-transparent"
+      dir={isArabic ? "rtl" : "ltr"}
+    >
+      <EarthBackground />
       <SiteHeader />
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <h1 className="text-3xl font-bold text-slate-50">{copy.title}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-          {copy.intro}
-        </p>
-
-        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/55 p-6">
-          <h2 className="text-xl font-semibold text-slate-100">{copy.why}</h2>
-          <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
-            {copy.whyItems.map((item) => (
-              <li key={item}>- {item}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/55 p-6">
-          <h2 className="text-xl font-semibold text-slate-100">{copy.flow}</h2>
-          <ol className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
-            {copy.flowItems.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/55 p-6">
-          <h2 className="text-xl font-semibold text-slate-100">{copy.impact}</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-300">
-            {copy.impactBody}
+      <main className="relative z-10 mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className={`mb-16 ${isArabic ? "text-right" : "text-left"}`}
+        >
+          <h1 className="text-4xl sm:text-5xl font-bold text-slate-50 mb-4">
+            {copy.title}
+          </h1>
+          <p className="text-lg text-slate-300 max-w-3xl leading-relaxed">
+            {copy.subtitle}
           </p>
-        </section>
+        </motion.div>
+
+        <div className="grid gap-8 md:grid-cols-3 mb-20">
+          {sections.map((section, idx) => (
+            <GlassmorphicCard
+              key={idx}
+              section={section}
+              index={idx}
+              isArabic={isArabic}
+            />
+          ))}
+        </div>
       </main>
     </div>
   );

@@ -6,8 +6,8 @@ import { motion, useMotionValue } from "framer-motion";
 import { SiteHeader } from "@/components/site-header";
 import { useLanguage } from "@/contexts/language-context";
 
-const Policies3DBackground = dynamic(
-  () => import("@/components/policies-3d-background"),
+const EarthBackground = dynamic(
+  () => import("@/components/earth-background").then((mod) => mod.EarthBackground),
   { ssr: false },
 );
 
@@ -167,7 +167,7 @@ export default function PoliciesPage() {
     >
       <SiteHeader />
       <Suspense fallback={null}>
-        <Policies3DBackground />
+        <EarthBackground />
       </Suspense>
       <main className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-12 max-w-4xl space-y-6">
