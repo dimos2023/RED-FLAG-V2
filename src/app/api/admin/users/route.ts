@@ -116,9 +116,7 @@ export async function DELETE(request: Request) {
   // First attempt to remove auth user via Admin API
   try {
     // supabase-js v2 admin delete user
-    // @ts-expect-error supabase-js exposes admin.deleteUser on the admin client in runtime; typing mismatch with bundled types
     if (adminClient.auth?.admin?.deleteUser) {
-      // @ts-expect-error explained above: runtime admin API may exist even if types don't reflect it
       const { error: delErr } = await adminClient.auth.admin.deleteUser(id);
       if (delErr) {
         console.warn("auth.admin.deleteUser error", (delErr as Error).message);
