@@ -4,7 +4,6 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState, type FC } from "react";
 import { type Mesh, Vector3, BackSide } from "three";
-import earthTextureImg from "@/earth.jpg";
 
 export type FocusPoint = {
   x: number;
@@ -35,8 +34,15 @@ function CameraRig({ focusPoint }: GlobeBackgroundProps) {
 }
 
 function GlobeMesh({ focusPoint }: GlobeBackgroundProps) {
-  const texture = useTexture(earthTextureImg.src as string);
+  const texture = useTexture("/earth.jpg?v=2");
   const globeRef = useRef<Mesh | null>(null);
+
+  useEffect(() => {
+    if (texture) {
+      texture.needsUpdate = true;
+    }
+  }, [texture]);
+
   useFrame(() => {
     if (!globeRef.current) {
       return;
@@ -53,7 +59,7 @@ function GlobeMesh({ focusPoint }: GlobeBackgroundProps) {
         <meshStandardMaterial
           map={texture}
           metalness={0.1}
-          roughness={0.65}
+          roughness={0.8}
           emissive="#101a2d"
           emissiveIntensity={0.18}
           envMapIntensity={0.65}
@@ -98,7 +104,7 @@ export const GlobeBackground: FC<GlobeBackgroundProps> = ({ focusPoint }) => {
         {overlay}
         <Canvas camera={{ position: [0, 18, 32], fov: 35 }}>
           <color attach="background" args={["#02040b"]} />
-          <ambientLight intensity={0.75} />
+          <ambientLight intensity={0.9} />
           <hemisphereLight args={["#8cc8ff", "#021221", 0.25]} />
           <directionalLight
             position={[6, 12, 8]}
