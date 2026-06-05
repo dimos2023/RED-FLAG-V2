@@ -1,21 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { type SVGProps, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAdminStatus } from "@/hooks/use_admin_status";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 
+function GlobeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
 export function SiteHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState<boolean>(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const languageMenuRef = useRef<HTMLDivElement | null>(null);
+  const languageMobileMenuRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
   const { user, isHydrated, signOut, adminRoleCheckNotice, dismissAdminRoleCheckNotice } =
     useAuth();
   const { isAdmin, isAdminResolved } = useAdminStatus();
-  const { language, isArabic, toggleLanguage } = useLanguage();
+  const { language, isArabic, setLanguage } = useLanguage();
   const copy = isArabic
     ? {
         home: "الرئيسية",
@@ -89,6 +103,72 @@ export function SiteHeader() {
     return () => window.removeEventListener("mousedown", handleOutsideClick);
   }, [isUserMenuOpen]);
 
+  useEffect(() => {
+    if (!isLanguageMenuOpen) {
+      return;
+    }
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        languageMenuRef.current?.contains(target) ||
+        languageMobileMenuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setIsLanguageMenuOpen(false);
+    }
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
+  }, [isLanguageMenuOpen]);
+
+  const handleLanguageChange = (locale: "en" | "ar") => {
+    setLanguage(locale);
+    setIsLanguageMenuOpen(false);
+  };
+
+  const languageDropdown = (
+    <div ref={languageMenuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsLanguageMenuOpen((prev) => !prev)}
+        aria-haspopup="menu"
+        aria-expanded={isLanguageMenuOpen}
+        aria-label={isArabic ? "اختر اللغة" : "Select language"}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-200 transition-colors duration-200 ease-out hover:border-emerald-400 hover:text-emerald-400"
+      >
+        <GlobeIcon className="h-5 w-5" />
+      </button>
+      {isLanguageMenuOpen ? (
+        <div className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => handleLanguageChange("en")}
+            className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition-colors duration-150 ease-out ${
+              language === "en"
+                ? "bg-slate-900 text-emerald-300"
+                : "text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            English
+            {language === "en" ? <span>✓</span> : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleLanguageChange("ar")}
+            className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition-colors duration-150 ease-out ${
+              language === "ar"
+                ? "bg-slate-900 text-emerald-300"
+                : "text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            العربية
+            {language === "ar" ? <span>✓</span> : null}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
   const userDropdown = user ? (
     <div ref={userMenuRef} className="relative">
       <button
@@ -97,10 +177,16 @@ export function SiteHeader() {
         className="rounded-lg border border-slate-700 px-2 py-1 text-slate-200 transition-colors duration-200 ease-out hover:bg-slate-900"
         aria-expanded={isUserMenuOpen}
       >
-        <span className="inline-flex items-center gap-2 text-sm font-medium">
+        <motion.span
+          className="inline-flex items-center gap-2 text-sm font-medium"
+          whileHover={{
+            textShadow: "0 0 18px rgba(16,185,129,0.65)",
+          }}
+          transition={{ type: "spring", stiffness: 220, damping: 22 }}
+        >
           <span>{userLabel}</span>
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-        </span>
+        </motion.span>
       </button>
       {isUserMenuOpen ? (
         <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
@@ -159,14 +245,6 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav className="hidden items-center gap-2 text-sm lg:flex lg:gap-4">
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-900"
-            aria-label={language === "en" ? "Switch to Arabic" : "Switch to English"}
-          >
-            {copy.langButton}
-          </button>
           <Link
             href="/"
             className={linkClass("/")}
@@ -248,16 +326,49 @@ export function SiteHeader() {
               {userDropdown}
             </>
           )}
+          {languageDropdown}
         </nav>
         <div className="flex items-center gap-2 lg:hidden">
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-900"
-            aria-label={language === "en" ? "Switch to Arabic" : "Switch to English"}
-          >
-            {copy.langButton}
-          </button>
+          <div ref={languageMobileMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsLanguageMenuOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={isLanguageMenuOpen}
+              aria-label={isArabic ? "اختر اللغة" : "Select language"}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-200 transition-colors duration-200 ease-out hover:border-emerald-400 hover:text-emerald-400"
+            >
+              <GlobeIcon className="h-5 w-5" />
+            </button>
+            {isLanguageMenuOpen ? (
+              <div className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
+                <button
+                  type="button"
+                  onClick={() => handleLanguageChange("en")}
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition-colors duration-150 ease-out ${
+                    language === "en"
+                      ? "bg-slate-900 text-emerald-300"
+                      : "text-slate-200 hover:bg-slate-900"
+                  }`}
+                >
+                  English
+                  {language === "en" ? <span>✓</span> : null}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLanguageChange("ar")}
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition-colors duration-150 ease-out ${
+                    language === "ar"
+                      ? "bg-slate-900 text-emerald-300"
+                      : "text-slate-200 hover:bg-slate-900"
+                  }`}
+                >
+                  العربية
+                  {language === "ar" ? <span>✓</span> : null}
+                </button>
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}

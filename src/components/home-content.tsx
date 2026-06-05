@@ -1,13 +1,85 @@
 "use client";
 
+import { motion } from "framer-motion";
 import Link from "next/link";
+import { type SVGProps, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
+import { LandingBnnScene, type FocusPoint } from "@/components/landing-bnn-scene";
+
+type AttentionSection = "search" | "guarantees" | null;
+
+function FlagIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 21V4a1 1 0 0 1 1-1h14l-3 5 3 5H5v8" />
+    </svg>
+  );
+}
 
 export function HomeContent() {
   const { user, isHydrated } = useAuth();
   const { isArabic } = useLanguage();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [focusPoint, setFocusPoint] = useState<FocusPoint>({ x: 0, y: 0 });
+  const [attentionSection, setAttentionSection] = useState<AttentionSection>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+  const [hasCamera, setHasCamera] = useState<boolean>(false);
   const primaryHref: string = user?.isVerified ? "/dashboard" : "/register";
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
+      return;
+    }
+
+    let isMounted = true;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        if (!isMounted) {
+          return;
+        }
+        const hasVideoInput = devices.some(
+          (device) => device.kind === "videoinput",
+        );
+        setHasCamera(hasVideoInput);
+      })
+      .catch(() => {
+        if (isMounted) {
+          setHasCamera(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = wrapperRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+      const y = ((event.clientY - rect.top) / rect.height - 0.5) * -2;
+      setFocusPoint({ x: Number(x.toFixed(3)), y: Number(y.toFixed(3)) });
+    };
+
+    const handlePointerLeave = () => {
+      setFocusPoint({ x: 0, y: 0 });
+      setAttentionSection(null);
+    };
+
+    container.addEventListener("pointermove", handlePointerMove);
+    container.addEventListener("pointerleave", handlePointerLeave);
+    return () => {
+      container.removeEventListener("pointermove", handlePointerMove);
+      container.removeEventListener("pointerleave", handlePointerLeave);
+    };
+  }, []);
+
   const copy = isArabic
     ? {
         badge: "بنية نزاهة موثقة",
@@ -48,8 +120,18 @@ export function HomeContent() {
         g3: "Monetized Data Access: Viewing protected evidence is a fee-based service to ensure qualified inquiries.",
         g4: "Digital T.O.S Liability Gate: All uploads require digitally signed Terms of Service, ensuring uploader accountability.",
       };
+  const searchCardActive = attentionSection === "search" || isSearchFocused;
+  const guaranteesActive = attentionSection === "guarantees";
+
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-16">
+    <div ref={wrapperRef} className="relative overflow-hidden">
+      <LandingBnnScene focusPoint={focusPoint} />
+      <p className="sr-only">
+        {hasCamera
+          ? "Nano-BNN attention: webcam source enabled."
+          : "Nano-BNN attention: pointer fallback active."}
+      </p>
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-16">
       <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-red-400/95">
@@ -86,12 +168,34 @@ export function HomeContent() {
               </Link>
             )}
           </div>
-          <div className="mt-8 rounded-2xl border border-slate-800/90 bg-slate-900/60 p-4 ring-1 ring-slate-700/40 backdrop-blur-sm">
+          <motion.div
+            initial={false}
+            animate={{
+              scale: searchCardActive ? 1.006 : 1,
+              translateZ: searchCardActive ? 20 : 0,
+              boxShadow: searchCardActive
+                ? "0 32px 90px rgba(16,185,129,0.16)"
+                : "0 20px 40px rgba(0,0,0,0.14)",
+              filter: searchCardActive ? "contrast(1.05)" : "contrast(1)",
+            }}
+            transition={{ type: "spring", stiffness: 180, damping: 24 }}
+            className="mt-8 rounded-2xl border border-slate-800/90 bg-slate-900/60 p-4 ring-1 ring-slate-700/40 backdrop-blur-sm"
+            onMouseEnter={() => setAttentionSection("search")}
+            onMouseLeave={() => setAttentionSection(isSearchFocused ? "search" : null)}
+          >
             <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
               <div className="relative">
-                <input
+                <motion.input
                   type="search"
                   placeholder={copy.searchPlaceholder}
+                  onFocus={() => {
+                    setIsSearchFocused(true);
+                    setAttentionSection("search");
+                  }}
+                  onBlur={() => {
+                    setIsSearchFocused(false);
+                    setAttentionSection(null);
+                  }}
                   className="w-full rounded-xl border border-slate-700 bg-slate-950/85 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-red-500/60 focus:ring-2 focus:ring-red-500/25"
                 />
                 <Link
@@ -102,16 +206,42 @@ export function HomeContent() {
                 </Link>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-2 text-xs text-slate-300 md:max-w-[260px]">
-                <p className="font-semibold uppercase tracking-wide text-slate-400">
-                  {copy.legend}
-                </p>
+                <div className="flex items-center gap-2">
+                  <FlagIcon
+                    className={`h-4 w-4 transition-all duration-300 ${
+                      searchCardActive
+                        ? "text-emerald-300 scale-110 opacity-100"
+                        : "text-slate-500 opacity-80"
+                    }`}
+                  />
+                  <p className="font-semibold uppercase tracking-wide text-slate-400">
+                    {copy.legend}
+                  </p>
+                </div>
                 <p className="mt-1 text-red-300">{copy.red}</p>
                 <p className="mt-1 text-emerald-300">{copy.green}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/92 to-slate-950/95 p-6 shadow-2xl shadow-black/50 ring-1 ring-slate-800/80">
+        <motion.div
+          initial={false}
+          animate={{
+            scale: guaranteesActive ? 1.007 : 1,
+            translateZ: guaranteesActive ? 18 : 0,
+            rotateX: guaranteesActive ? 2 : 0,
+            boxShadow: guaranteesActive
+              ? "0 36px 110px rgba(16,185,129,0.18)"
+              : "0 18px 50px rgba(0,0,0,0.14)",
+            filter: guaranteesActive
+              ? "drop-shadow(0 0 32px rgba(16,185,129,0.2))"
+              : "none",
+          }}
+          transition={{ type: "spring", stiffness: 170, damping: 26 }}
+          className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/92 to-slate-950/95 p-6 shadow-2xl shadow-black/50 ring-1 ring-slate-800/80"
+          onMouseEnter={() => setAttentionSection("guarantees")}
+          onMouseLeave={() => setAttentionSection(null)}
+        >
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             {copy.guarantees}
           </h2>
@@ -141,8 +271,9 @@ export function HomeContent() {
               </span>
             </li>
           </ul>
-        </div>
+        </motion.div>
       </div>
     </main>
+  </div>
   );
 }
