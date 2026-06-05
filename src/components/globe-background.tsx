@@ -3,7 +3,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState, type FC } from "react";
-import { type Mesh, Vector3 } from "three";
+import { type Mesh, Vector3, BackSide } from "three";
 import earthTextureImg from "@/earth.jpg";
 
 export type FocusPoint = {
@@ -47,16 +47,30 @@ function GlobeMesh({ focusPoint }: GlobeBackgroundProps) {
   });
 
   return (
-    <mesh ref={globeRef} position={[0, 0.2, 0]}> 
-      <sphereGeometry args={[6.2, 64, 64]} />
-      <meshStandardMaterial
-        map={texture}
-        metalness={0.08}
-        roughness={0.45}
-        emissive="#0a2236"
-        emissiveIntensity={0.14}
-      />
-    </mesh>
+    <>
+      <mesh ref={globeRef} position={[0, 0.2, 0]}> 
+        <sphereGeometry args={[6.2, 64, 64]} />
+        <meshStandardMaterial
+          map={texture}
+          metalness={0.1}
+          roughness={0.65}
+          emissive="#101a2d"
+          emissiveIntensity={0.18}
+          envMapIntensity={0.65}
+        />
+      </mesh>
+      <mesh position={[0, 0.2, 0]}>
+        <sphereGeometry args={[6.35, 64, 64]} />
+        <meshPhongMaterial
+          color="#0a2f4b"
+          transparent
+          opacity={0.08}
+          shininess={8}
+          specular="#81d8ff"
+          side={BackSide}
+        />
+      </mesh>
+    </>
   );
 }
 
@@ -84,9 +98,19 @@ export const GlobeBackground: FC<GlobeBackgroundProps> = ({ focusPoint }) => {
         {overlay}
         <Canvas camera={{ position: [0, 18, 32], fov: 35 }}>
           <color attach="background" args={["#02040b"]} />
-          <ambientLight intensity={0.35} />
-          <directionalLight position={[5, 10, 5]} intensity={0.95} />
-          <directionalLight position={[-5, 3, -5]} intensity={0.45} />
+          <ambientLight intensity={0.75} />
+          <hemisphereLight args={["#8cc8ff", "#021221", 0.25]} />
+          <directionalLight
+            position={[6, 12, 8]}
+            intensity={1.8}
+            castShadow={false}
+            color="#f5f8ff"
+          />
+          <directionalLight
+            position={[-8, 6, -5]}
+            intensity={0.95}
+            color="#94d2ff"
+          />
           <Stars radius={80} depth={40} count={4500} factor={4} saturation={0.35} fade />
           <CameraRig focusPoint={focusPoint} />
           <GlobeMesh focusPoint={focusPoint} />
