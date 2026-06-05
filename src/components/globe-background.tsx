@@ -1,9 +1,10 @@
 "use client";
 
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
-import { useEffect, useMemo, useRef, useState, type FC } from "react";
-import { type Mesh, TextureLoader, Vector3 } from "three";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Stars, useTexture } from "@react-three/drei";
+import { Suspense, useEffect, useMemo, useRef, useState, type FC } from "react";
+import { type Mesh, Vector3 } from "three";
+import earthTextureImg from "@/earth.jpg";
 
 export type FocusPoint = {
   x: number;
@@ -34,10 +35,7 @@ function CameraRig({ focusPoint }: GlobeBackgroundProps) {
 }
 
 function GlobeMesh({ focusPoint }: GlobeBackgroundProps) {
-  const texture = useLoader(
-    TextureLoader,
-    "https://raw.githubusercontent.com/spite/THREE.Earth/master/images/earth.jpg",
-  );
+  const texture = useTexture(earthTextureImg.src as string);
   const globeRef = useRef<Mesh | null>(null);
   useFrame(() => {
     if (!globeRef.current) {
@@ -77,28 +75,34 @@ export const GlobeBackground: FC<GlobeBackgroundProps> = ({ focusPoint }) => {
   }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      {overlay}
-      <Canvas camera={{ position: [0, 18, 32], fov: 35 }}>
-        <color attach="background" args={["#02040b"]} />
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[5, 10, 5]} intensity={0.95} />
-        <directionalLight position={[-5, 3, -5]} intensity={0.45} />
-        <Stars radius={80} depth={40} count={4500} factor={4} saturation={0.35} fade />
-        <CameraRig focusPoint={focusPoint} />
-        <GlobeMesh focusPoint={focusPoint} />
-        {loaded ? (
-          <mesh position={[0, 0.5, 0]}> 
-            <sphereGeometry args={[6.25, 64, 64]} />
-            <meshStandardMaterial
-              color="#000000"
-              transparent
-              opacity={0.08}
-              roughness={0.8}
-            />
-          </mesh>
-        ) : null}
-      </Canvas>
-    </div>
+    <Suspense
+      fallback={
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-slate-950" />
+      }
+    >
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        {overlay}
+        <Canvas camera={{ position: [0, 18, 32], fov: 35 }}>
+          <color attach="background" args={["#02040b"]} />
+          <ambientLight intensity={0.35} />
+          <directionalLight position={[5, 10, 5]} intensity={0.95} />
+          <directionalLight position={[-5, 3, -5]} intensity={0.45} />
+          <Stars radius={80} depth={40} count={4500} factor={4} saturation={0.35} fade />
+          <CameraRig focusPoint={focusPoint} />
+          <GlobeMesh focusPoint={focusPoint} />
+          {loaded ? (
+            <mesh position={[0, 0.5, 0]}> 
+              <sphereGeometry args={[6.25, 64, 64]} />
+              <meshStandardMaterial
+                color="#000000"
+                transparent
+                opacity={0.08}
+                roughness={0.8}
+              />
+            </mesh>
+          ) : null}
+        </Canvas>
+      </div>
+    </Suspense>
   );
 };
