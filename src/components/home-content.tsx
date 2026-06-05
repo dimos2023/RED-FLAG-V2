@@ -1,11 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { type SVGProps, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
-import { LandingBnnScene, type FocusPoint } from "@/components/landing-bnn-scene";
+import type { FocusPoint } from "@/components/globe-background";
+
+const GlobeBackground = dynamic(
+  () => import("@/components/globe-background").then((mod) => mod.GlobeBackground),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
 
 type AttentionSection = "search" | "guarantees" | null;
 
@@ -125,7 +134,7 @@ export function HomeContent() {
 
   return (
     <div ref={wrapperRef} className="relative overflow-hidden">
-      <LandingBnnScene focusPoint={focusPoint} />
+      <GlobeBackground focusPoint={focusPoint} />
       <p className="sr-only">
         {hasCamera
           ? "Nano-BNN attention: webcam source enabled."
