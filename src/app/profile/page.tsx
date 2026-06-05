@@ -262,6 +262,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-4">
                 <div className="h-20 w-20 overflow-hidden rounded-3xl border border-slate-700 bg-slate-900">
                   {avatarPreviewUrl || avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={avatarPreviewUrl ?? avatarUrl ?? ""}
                       alt="User avatar"

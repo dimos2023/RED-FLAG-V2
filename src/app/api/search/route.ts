@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   const results: PublicSearchMatch[] = reportRows.map((row) => {
     const reportId: string = row.id as string;
     const entityName: string =
-      ((row.subject_name as string | null) ?? (row.name as string | null))?.trim() || "Unnamed entity";
+      (row.subject_name as string | null)?.trim() || "Unnamed entity";
     const commercialRegistrationNumber: string | null =
       (row.subject_cr as string | null) ?? null;
     const phoneNumber: string | null = (row.subject_phone as string | null) ?? null;
