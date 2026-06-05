@@ -105,7 +105,7 @@ export function SiteHeader() {
       {isUserMenuOpen ? (
         <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
           <Link
-            href="/dashboard"
+            href="/profile"
             onClick={() => setIsUserMenuOpen(false)}
             className="block px-4 py-3 text-sm text-slate-100 hover:bg-slate-900"
           >
