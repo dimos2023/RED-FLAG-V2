@@ -2,14 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
-type GetQuery = {
-  page?: string;
-  per_page?: string;
-  search?: string;
-  verification_status?: string;
-  provider?: string;
-};
-
 export async function GET(request: Request) {
   const env = getSupabasePublicEnv();
   const serviceKey: string = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
@@ -68,13 +60,21 @@ export async function PUT(request: Request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: any;
+  let body: unknown;
   try {
     body = await request.json();
-  } catch {
+  } catch (err) {
+    const e = err as Error;
     return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
-  const { id, full_name, phone, national_id_number, verification_status } = body ?? {};
+  type UpdateRequest = {
+    id?: string;
+    full_name?: string | null;
+    phone?: string | null;
+    national_id_number?: string | null;
+    verification_status?: string | null;
+  };
+  const { id, full_name, phone, national_id_number, verification_status } = (body as UpdateRequest) ?? {};
   if (!id) {
     return NextResponse.json({ message: "Missing user id" }, { status: 400 });
   }
@@ -102,13 +102,15 @@ export async function DELETE(request: Request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: any;
+  let body: unknown;
   try {
     body = await request.json();
-  } catch {
+  } catch (err) {
+    const e = err as Error;
     return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
-  const { id } = body ?? {};
+  type DeleteRequest = { id?: string };
+  const { id } = (body as DeleteRequest) ?? {};
   if (!id) {
     return NextResponse.json({ message: "Missing user id" }, { status: 400 });
   }
@@ -116,16 +118,16 @@ export async function DELETE(request: Request) {
   // First attempt to remove auth user via Admin API
   try {
     // supabase-js v2 admin delete user
-    // @ts-ignore
+    // @ts-expect-error supabase-js exposes admin.deleteUser on the admin client in runtime; typing mismatch with bundled types
     if (adminClient.auth?.admin?.deleteUser) {
-      // @ts-ignore
+      // @ts-expect-error explained above: runtime admin API may exist even if types don't reflect it
       const { error: delErr } = await adminClient.auth.admin.deleteUser(id);
       if (delErr) {
-        console.warn("auth.admin.deleteUser error", delErr.message);
+        console.warn("auth.admin.deleteUser error", (delErr as Error).message);
       }
     }
   } catch (e) {
-    console.warn("deleteUser call failed", e);
+    console.warn("deleteUser call failed", e as Error);
   }
 
   // Remove profile row as well

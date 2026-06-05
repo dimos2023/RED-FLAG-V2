@@ -149,7 +149,7 @@ function CompleteRegistrationInner() {
     setShippingPostalCode(user.shippingPostalCode ?? "");
     setShippingCountry(user.shippingCountry ?? seed.countryHint ?? "");
     setNationalIdNumber(user.nationalIdNumber ?? "");
-  }, [user, supabaseUser, pending, isGoogleUser]);
+  }, [user, supabaseUser, pending, isGoogleUser, fullLegalName]);
   useEffect(() => {
     if (!supabaseUser || !user?.id || !isGoogleUser) {
       return;

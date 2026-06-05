@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
 type UserRow = {
   id: string;
@@ -24,7 +24,7 @@ export function AdminUsers() {
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  async function load() {
+  const load = useCallback(async () => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("per_page", String(perPage));
@@ -36,11 +36,11 @@ export function AdminUsers() {
     const data = await res.json();
     setUsers(data.users ?? []);
     setTotal(data.total ?? 0);
-  }
+  }, [page, perPage, search, verificationFilter, providerFilter]);
 
   useEffect(() => {
     void load();
-  }, [page, verificationFilter, providerFilter]);
+  }, [load]);
 
   async function handleSearchSubmit(e?: React.FormEvent) {
     e?.preventDefault();
