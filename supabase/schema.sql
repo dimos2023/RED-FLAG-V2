@@ -27,6 +27,7 @@ create table if not exists public.profiles (
   company_country text,
   company_location_note text,
   national_id_storage_path text[],
+  avatar_url text,
   created_at timestamptz not null default now()
 );
 
@@ -94,6 +95,23 @@ create policy "reports_update_admin"
   on public.reports for update to authenticated
   using (exists (select 1 from public.app_admins a where a.user_id = auth.uid()))
   with check (exists (select 1 from public.app_admins a where a.user_id = auth.uid()));
+
+create table if not exists public.search_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  query text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.search_logs enable row level security;
+
+create policy "search_logs_select_self"
+  on public.search_logs for select to authenticated
+  using (auth.uid() = user_id);
+
+create policy "search_logs_insert_self"
+  on public.search_logs for insert to authenticated
+  with check (auth.uid() = user_id);
 
 create table if not exists public.evidence_objects (
   id uuid primary key default gen_random_uuid(),

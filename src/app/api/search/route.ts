@@ -53,6 +53,11 @@ export async function POST(request: Request) {
     );
   }
 
+  await supabase.schema("public").from("search_logs").insert({
+    user_id: user.id,
+    query,
+  });
+
   const env = getSupabasePublicEnv();
   const serviceKey: string = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
   if (!env || !serviceKey) {
@@ -81,7 +86,7 @@ export async function POST(request: Request) {
     .schema("public")
     .from("reports")
     .select(
-      "id, subject_name, name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status",
+      "id, subject_name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status",
     )
     .eq("review_status", "approved")
     .or(orFilter)

@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAdminStatus } from "@/hooks/use_admin_status";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
 
 export function SiteHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const pathname = usePathname();
   const { user, isHydrated, signOut, adminRoleCheckNotice, dismissAdminRoleCheckNotice } =
     useAuth();
   const { isAdmin, isAdminResolved } = useAdminStatus();
@@ -22,6 +26,7 @@ export function SiteHeader() {
         admin: "الإدارة",
         report: "بلاغ",
         signOut: "تسجيل الخروج",
+        profile: "الملف الشخصي",
         completeVerification: "استكمال التحقق",
         signIn: "تسجيل الدخول",
         register: "إنشاء حساب",
@@ -37,6 +42,7 @@ export function SiteHeader() {
         search: "Search",
         admin: "Admin panel",
         report: "Report",
+        profile: "Profile",
         signOut: "Sign out",
         completeVerification: "Complete verification",
         signIn: "Sign in",
@@ -45,6 +51,80 @@ export function SiteHeader() {
         menu: "Menu",
         close: "Close",
       };
+
+  const activeLink = (href: string): boolean => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const linkBaseClasses =
+    "rounded-lg px-2 py-1 transition-colors duration-200 ease-out";
+
+  const linkClass = (href: string) =>
+    `${linkBaseClasses} ${
+      activeLink(href)
+        ? "bg-emerald-600/15 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.12)]"
+        : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+    }`;
+
+  const userLabel =
+    user?.fullName?.trim() || user?.email?.trim() ||
+    (isArabic ? "الحساب" : "Account");
+
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return;
+    }
+    function handleOutsideClick(event: MouseEvent) {
+      if (!userMenuRef.current) {
+        return;
+      }
+      if (!userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
+  }, [isUserMenuOpen]);
+
+  const userDropdown = user ? (
+    <div ref={userMenuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsUserMenuOpen((prev) => !prev)}
+        className="rounded-lg border border-slate-700 px-2 py-1 text-slate-200 transition-colors duration-200 ease-out hover:bg-slate-900"
+        aria-expanded={isUserMenuOpen}
+      >
+        <span className="inline-flex items-center gap-2 text-sm font-medium">
+          <span>{userLabel}</span>
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        </span>
+      </button>
+      {isUserMenuOpen ? (
+        <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
+          <Link
+            href="/dashboard"
+            onClick={() => setIsUserMenuOpen(false)}
+            className="block px-4 py-3 text-sm text-slate-100 hover:bg-slate-900"
+          >
+            {copy.profile}
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setIsUserMenuOpen(false);
+              signOut();
+            }}
+            className="w-full px-4 py-3 text-left text-sm text-slate-100 hover:bg-slate-900"
+          >
+            {copy.signOut}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
@@ -89,19 +169,19 @@ export function SiteHeader() {
           </button>
           <Link
             href="/"
-            className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            className={linkClass("/")}
           >
             {copy.home}
           </Link>
           <Link
             href="/about"
-            className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            className={linkClass("/about")}
           >
             {copy.about}
           </Link>
           <Link
             href="/policies"
-            className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+            className={linkClass("/policies")}
           >
             {copy.policies}
           </Link>
@@ -125,55 +205,37 @@ export function SiteHeader() {
           ) : !isAdminResolved ? (
             <>
               <span className="h-4 w-28 animate-pulse rounded bg-slate-800" />
-              <button
-                type="button"
-                onClick={() => signOut()}
-                className="rounded-lg px-2 py-1 text-slate-500 hover:text-slate-300"
-              >
-                {copy.signOut}
-              </button>
+              {userDropdown}
             </>
           ) : user.isVerified ? (
             <>
-              <Link href="/dashboard" className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200">{copy.dashboard}</Link>
+              <Link href="/dashboard" className={linkClass("/dashboard")}>{copy.dashboard}</Link>
               {isAdmin && isAdminResolved ? (
                 <Link
                   href="/admin/requests"
-                  className="rounded-lg px-2 py-1 text-amber-400/90 hover:bg-slate-900 hover:text-amber-300"
+                  className={linkClass("/admin")}
                 >
                   {copy.admin}
                 </Link>
               ) : null}
-              <Link href="/search" className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200">{copy.search}</Link>
+              <Link href="/search" className={linkClass("/search")}>{copy.search}</Link>
               <Link
                 href="/report"
-                className="rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white shadow-lg shadow-red-900/30 hover:bg-red-500"
+                className={activeLink("/report") ? "rounded-lg bg-emerald-600 px-3 py-1.5 font-medium text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 transition-colors duration-200 ease-out" : "rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white shadow-lg shadow-red-900/30 hover:bg-red-500"}
               >
                 {copy.report}
               </Link>
-              <button
-                type="button"
-                onClick={() => signOut()}
-                className="rounded-lg px-2 py-1 text-slate-500 hover:text-slate-300"
-              >
-                {copy.signOut}
-              </button>
+              {userDropdown}
             </>
           ) : isAdmin && isAdminResolved ? (
             <>
               <Link
                 href="/admin/requests"
-                className="rounded-lg px-2 py-1 text-amber-400/90 hover:bg-slate-900 hover:text-amber-300"
+                className={linkClass("/admin")}
               >
                 {copy.admin}
               </Link>
-              <button
-                type="button"
-                onClick={() => signOut()}
-                className="rounded-lg px-2 py-1 text-slate-500 hover:text-slate-300"
-              >
-                {copy.signOut}
-              </button>
+              {userDropdown}
             </>
           ) : (
             <>
@@ -183,13 +245,7 @@ export function SiteHeader() {
               >
                 {copy.completeVerification}
               </Link>
-              <button
-                type="button"
-                onClick={() => signOut()}
-                className="rounded-lg px-2 py-1 text-slate-500 hover:text-slate-300"
-              >
-                {copy.signOut}
-              </button>
+              {userDropdown}
             </>
           )}
         </nav>

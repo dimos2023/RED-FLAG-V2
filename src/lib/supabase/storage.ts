@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Must match `supabase/migrations/*_fraud_evidence_bucket.sql` */
 export const FRAUD_EVIDENCE_BUCKET_ID = "fraud-evidence";
+export const AVATAR_BUCKET_ID = "avatars";
 
 const DEFAULT_FILE_EXTENSION: string = "bin";
 
@@ -12,6 +13,15 @@ const ALLOWED_MIME = new Set<string>([
   "image/webp",
   "image/gif",
 ]);
+
+const AVATAR_ALLOWED_MIME = new Set<string>([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+const MAX_AVATAR_FILE_BYTES = 5_000_000; // 5MB
 
 const EXTENSION_TO_MIME: Record<string, string> = {
   pdf: "application/pdf",
@@ -159,4 +169,62 @@ export async function uploadFraudEvidence(
     return { ok: false, message: error.message };
   }
   return { ok: true, path };
+}
+
+export type UploadAvatarResult =
+  | { ok: true; path: string; publicUrl: string }
+  | { ok: false; message: string };
+
+export function isValidAvatarFile(file: File | null | undefined): file is File {
+  if (file === null || file === undefined) {
+    return false;
+  }
+  if (!(file instanceof File)) {
+    return false;
+  }
+  if (file.size <= 0 || file.size > MAX_AVATAR_FILE_BYTES) {
+    return false;
+  }
+  const name: string | undefined = file.name?.trim();
+  if (!name || name.length === 0) {
+    return false;
+  }
+  return AVATAR_ALLOWED_MIME.has(file.type.trim().toLowerCase());
+}
+
+export async function uploadUserAvatar(
+  supabase: SupabaseClient,
+  userId: string,
+  file: File,
+): Promise<UploadAvatarResult> {
+  if (!isValidAvatarFile(file)) {
+    return { ok: false, message: "Please choose a valid avatar image up to 5MB." };
+  }
+  const contentType: string = resolveContentType(file);
+  if (!AVATAR_ALLOWED_MIME.has(contentType)) {
+    return {
+      ok: false,
+      message: "Only JPG, PNG, WEBP, and GIF avatar images are allowed.",
+    };
+  }
+  const objectName: string = buildStorageObjectName(file);
+  const path: string = `${userId}/${objectName}`;
+  const { error } = await supabase.storage
+    .from(AVATAR_BUCKET_ID)
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: true,
+      contentType,
+    });
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+  const publicUrl = supabase.storage
+    .from(AVATAR_BUCKET_ID)
+    .getPublicUrl(path)
+    .data?.publicUrl;
+  if (!publicUrl) {
+    return { ok: false, message: "Unable to build avatar public URL." };
+  }
+  return { ok: true, path, publicUrl };
 }
