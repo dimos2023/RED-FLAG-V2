@@ -98,6 +98,12 @@ export function AdminShell({ children }: AdminShellProps) {
               Report queue
             </Link>
             <Link
+              href="/admin/users"
+              className="text-slate-300 underline-offset-4 hover:text-white hover:underline"
+            >
+              Users
+            </Link>
+            <Link
               href="/dashboard"
               className="text-slate-500 hover:text-slate-300"
             >
