@@ -4,15 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { FraudReportRow, ReportReviewStatus } from "@/types";
 
+type AdminReportRow = FraudReportRow & {
+  name?: string | null;
+};
+
 type FilterStatus = "all" | ReportReviewStatus;
 
 export default function AdminRequestsPage() {
   const supabase = createSupabaseBrowserClient();
   const [filter, setFilter] = useState<FilterStatus>("pending");
-  const [rows, setRows] = useState<FraudReportRow[]>([]);
+  const [rows, setRows] = useState<AdminReportRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
-  const [selected, setSelected] = useState<FraudReportRow | null>(null);
+  const [selected, setSelected] = useState<AdminReportRow | null>(null);
   const [note, setNote] = useState<string>("");
   const [actionPending, setActionPending] = useState<boolean>(false);
 
@@ -41,7 +45,7 @@ export default function AdminRequestsPage() {
       setRows([]);
       return;
     }
-    setRows((data ?? []) as FraudReportRow[]);
+    setRows((data ?? []) as AdminReportRow[]);
   }, [supabase, filter]);
 
   useEffect(() => {
@@ -136,7 +140,7 @@ export default function AdminRequestsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-medium text-slate-200">
-                        {r.subject_name ?? (r as any).name ?? "Unnamed entity"}
+                        {r.subject_name ?? r.name ?? "Unnamed entity"}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {new Date(r.created_at).toLocaleString()}
@@ -199,7 +203,7 @@ export default function AdminRequestsPage() {
                 rows.map((r) => (
                   <tr key={r.id} className="bg-slate-950/40 hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-200">
-                      {r.subject_name ?? (r as any).name ?? "Unnamed entity"}
+                      {r.subject_name ?? r.name ?? "Unnamed entity"}
                       <p className="mt-0.5 line-clamp-2 text-xs font-normal text-slate-500">
                         {r.subject_address}
                       </p>
@@ -279,7 +283,7 @@ export default function AdminRequestsPage() {
                 ? "Decision"
                 : "Report details"}
             </h3>
-            <p className="mt-2 text-sm text-slate-400">{selected.subject_name ?? (selected as any).name ?? "Unnamed entity"}</p>
+            <p className="mt-2 text-sm text-slate-400">{selected.subject_name ?? selected.name ?? "Unnamed entity"}</p>
             <dl className="mt-4 space-y-1 text-xs text-slate-500">
               <div>
                 <dt className="inline text-slate-600">Phone: </dt>
