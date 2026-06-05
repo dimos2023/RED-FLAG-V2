@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     .schema("public")
     .from("reports")
     .select(
-      "id, subject_name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status",
+      "id, subject_name, name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status",
     )
     .eq("review_status", "approved")
     .or(orFilter)
@@ -103,6 +103,7 @@ export async function POST(request: Request) {
 
   const reportIds: string[] = reportRows.map((row) => row.id as string);
   const { data: evidenceRows, error: evidenceError } = await adminClient
+    .schema("public")
     .from("evidence_objects")
     .select("report_id")
     .in("report_id", reportIds);
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
   const results: PublicSearchMatch[] = reportRows.map((row) => {
     const reportId: string = row.id as string;
     const entityName: string =
-      (row.subject_name as string | null)?.trim() || "Unnamed entity";
+      ((row.subject_name as string | null) ?? (row.name as string | null))?.trim() || "Unnamed entity";
     const commercialRegistrationNumber: string | null =
       (row.subject_cr as string | null) ?? null;
     const phoneNumber: string | null = (row.subject_phone as string | null) ?? null;

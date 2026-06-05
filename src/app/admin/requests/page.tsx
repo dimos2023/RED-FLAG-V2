@@ -28,7 +28,7 @@ export default function AdminRequestsPage() {
       .schema("public")
       .from("reports")
       .select(
-        "id, owner_id, subject_name, subject_phone, subject_cr, subject_address, review_status, reviewed_by, reviewed_at, admin_note, logo_storage_path, created_at",
+        "id, owner_id, subject_name, name, subject_phone, subject_cr, subject_address, review_status, reviewed_by, reviewed_at, admin_note, logo_storage_path, created_at",
       )
       .order("created_at", { ascending: false });
     if (filter !== "all") {
@@ -136,7 +136,7 @@ export default function AdminRequestsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-medium text-slate-200">
-                        {r.subject_name}
+                        {r.subject_name ?? (r as any).name ?? "Unnamed entity"}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {new Date(r.created_at).toLocaleString()}
@@ -199,7 +199,7 @@ export default function AdminRequestsPage() {
                 rows.map((r) => (
                   <tr key={r.id} className="bg-slate-950/40 hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-200">
-                      {r.subject_name}
+                      {r.subject_name ?? (r as any).name ?? "Unnamed entity"}
                       <p className="mt-0.5 line-clamp-2 text-xs font-normal text-slate-500">
                         {r.subject_address}
                       </p>
@@ -279,7 +279,7 @@ export default function AdminRequestsPage() {
                 ? "Decision"
                 : "Report details"}
             </h3>
-            <p className="mt-2 text-sm text-slate-400">{selected.subject_name}</p>
+            <p className="mt-2 text-sm text-slate-400">{selected.subject_name ?? (selected as any).name ?? "Unnamed entity"}</p>
             <dl className="mt-4 space-y-1 text-xs text-slate-500">
               <div>
                 <dt className="inline text-slate-600">Phone: </dt>
