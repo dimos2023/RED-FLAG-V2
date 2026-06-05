@@ -7,8 +7,8 @@ import { type Mesh, Vector3, BackSide } from "three";
 import earthImg from "@/earth.jpg";
 
 function StaticCameraRig() {
-  useFrame((_, delta) => {
-    const camera = _;
+  useFrame((state) => {
+    const camera = state.camera;
     camera.position.lerp(new Vector3(0, 14, 30), 0.005);
     camera.lookAt(new Vector3(0, 0.5, 0));
   });

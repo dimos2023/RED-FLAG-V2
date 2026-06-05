@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useLanguage } from "@/contexts/language-context";
 
