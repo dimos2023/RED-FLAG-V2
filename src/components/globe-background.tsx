@@ -4,6 +4,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState, type FC } from "react";
 import { type Mesh, Vector3, BackSide } from "three";
+import earthImg from "@/earth.jpg";
 
 export type FocusPoint = {
   x: number;
@@ -34,7 +35,7 @@ function CameraRig({ focusPoint }: GlobeBackgroundProps) {
 }
 
 function GlobeMesh({ focusPoint }: GlobeBackgroundProps) {
-  const texture = useTexture("/earth.jpg?v=2");
+  const texture = useTexture(earthImg.src as string);
   const globeRef = useRef<Mesh | null>(null);
 
   useEffect(() => {
