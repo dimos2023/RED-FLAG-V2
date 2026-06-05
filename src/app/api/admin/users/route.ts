@@ -63,8 +63,7 @@ export async function PUT(request: Request) {
   let body: unknown;
   try {
     body = await request.json();
-  } catch (err) {
-    const e = err as Error;
+  } catch {
     return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
   type UpdateRequest = {
@@ -105,8 +104,7 @@ export async function DELETE(request: Request) {
   let body: unknown;
   try {
     body = await request.json();
-  } catch (err) {
-    const e = err as Error;
+  } catch {
     return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
   type DeleteRequest = { id?: string };
