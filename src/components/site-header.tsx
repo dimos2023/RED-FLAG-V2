@@ -4,7 +4,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { type SVGProps, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { UserIcon } from "lucide-react";
 import { useAdminStatus } from "@/hooks/use_admin_status";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
@@ -214,6 +213,23 @@ export function SiteHeader() {
       ) : null}
     </div>
   ) : null;
+  const mobileProfileIcon = (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      className="mr-2 inline-block h-5 w-5 text-emerald-300 md:hidden"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+      />
+    </svg>
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
@@ -435,7 +451,7 @@ export function SiteHeader() {
                   className={mobileAccountLinkClasses}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    {mobileProfileIcon}
                     <span>{copy.profile}</span>
                   </span>
                 </Link>
@@ -488,7 +504,7 @@ export function SiteHeader() {
                   className={mobileAccountLinkClasses}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    {mobileProfileIcon}
                     <span>{copy.profile}</span>
                   </span>
                 </Link>
@@ -518,7 +534,7 @@ export function SiteHeader() {
                   className={mobileAccountLinkClasses}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    {mobileProfileIcon}
                     <span>{copy.profile}</span>
                   </span>
                 </Link>
@@ -548,7 +564,7 @@ export function SiteHeader() {
                   className={mobileAccountLinkClasses}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    {mobileProfileIcon}
                     <span>{copy.profile}</span>
                   </span>
                 </Link>
