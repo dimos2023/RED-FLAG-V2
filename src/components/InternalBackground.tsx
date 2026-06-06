@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import React from "react";
 
-export default function InternalBackground(): JSX.Element | null {
+export default function InternalBackground() {
   const pathname = usePathname();
 
   // treat root and Arabic root as the home page; do not render internal background there
