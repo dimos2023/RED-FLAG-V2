@@ -15,6 +15,7 @@ type PublicSearchMatch = {
   logoImageUrl: string | null;
   summary: string;
   hasEvidence: boolean;
+  createdAt?: string | null;
   evidenceFeeCents: number;
 };
 
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     .schema("public")
     .from("reports")
     .select(
-      "id, subject_name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status",
+      "id, subject_name, subject_cr, subject_phone, logo_storage_path, subject_address, review_status, created_at",
     )
     .eq("review_status", "approved")
     .or(orFilter)
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
       logoImageUrl,
       summary: locationSummary,
       hasEvidence: evidenceSet.has(reportId),
+      createdAt: (row.created_at as string | null) ?? null,
       evidenceFeeCents: 4900,
     };
   });

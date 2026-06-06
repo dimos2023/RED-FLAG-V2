@@ -9,6 +9,7 @@ import {
   type EvidenceRequestHit,
 } from "@/components/request-evidence-modal";
 import { useLanguage } from "@/contexts/language-context";
+import SearchFlagModal, { type PublicSearchMatchUI } from "@/components/SearchFlagModal";
 
 type SearchResult = {
   id: string;
@@ -19,6 +20,7 @@ type SearchResult = {
   summary: string;
   hasEvidence: boolean;
   evidenceFeeCents: number;
+  createdAt?: string | null;
 };
 
 function SearchPageContent() {
@@ -30,6 +32,7 @@ function SearchPageContent() {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [flag, setFlag] = useState<"idle" | "red" | "green">("idle");
+  const [modalOpenFlag, setModalOpenFlag] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [pending, setPending] = useState<boolean>(false);
   const copy = isArabic
@@ -102,8 +105,15 @@ function SearchPageContent() {
       setMessage(payload.message ?? copy.failed);
       return;
     }
-    setFlag(payload.flag ?? "green");
+    const nextFlag = (payload.flag as "red" | "green" | undefined) ?? "green";
+    setFlag(nextFlag);
     setResults(payload.results ?? []);
+    // open modal for both green and red states
+    if (nextFlag === "green" || nextFlag === "red") {
+      setModalOpenFlag(true);
+    } else {
+      setModalOpenFlag(false);
+    }
     setMessage(payload.message ?? "");
   }
 
@@ -155,16 +165,7 @@ function SearchPageContent() {
             <p className="mt-4 text-sm text-slate-300">{message}</p>
           ) : null}
 
-          {flag === "green" ? (
-            <div className="mt-6 rounded-xl border border-emerald-800/60 bg-emerald-950/30 p-4">
-              <p className="text-sm font-semibold text-emerald-300">
-                {copy.green}
-              </p>
-              <p className="mt-1 text-sm text-emerald-100/80">
-                {copy.greenMsg}
-              </p>
-            </div>
-          ) : null}
+          {/* modal will show green/red results */}
 
           <ul className="mt-6 space-y-3">
             {results.map((row) => (
@@ -214,6 +215,22 @@ function SearchPageContent() {
         onClose={() => {
           setModalOpen(false);
           setActive(null);
+        }}
+      />
+      <SearchFlagModal
+        open={modalOpenFlag}
+        flag={flag === "idle" ? "idle" : flag}
+        results={(results as unknown as PublicSearchMatchUI[]) ?? []}
+        isArabic={isArabic}
+        onClose={() => {
+          setModalOpenFlag(false);
+          // reset search state so user can start again
+          setFlag("idle");
+          setResults([]);
+          setMessage("");
+          setQuery("");
+          // remove query param from URL
+          router.replace(`/search`);
         }}
       />
     </div>
