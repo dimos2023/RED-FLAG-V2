@@ -129,7 +129,76 @@ export function AdminUsers() {
         </button>
       </form>
 
-      <div className="mt-6 overflow-x-auto">
+      {/* Mobile: cards/list view (no horizontal scroll) */}
+      <div className="mt-6 md:hidden overflow-x-hidden">
+        {users.length === 0 ? (
+          <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-500">
+            No users found
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {users.map((u) => (
+              <div
+                key={u.id}
+                className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-100">
+                      {u.full_name ?? "—"}
+                    </p>
+                    <p className="mt-1 break-words text-xs text-slate-400">
+                      {u.email}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-slate-900/60 px-2 py-1 text-[11px] font-semibold text-slate-200">
+                    {u.verification_status ?? "pending"}
+                  </span>
+                </div>
+
+                <dl className="mt-3 space-y-1 text-xs text-slate-500">
+                  <div>
+                    <dt className="inline text-slate-600">Phone: </dt>
+                    <dd className="inline text-slate-400">{u.phone ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-slate-600">National ID: </dt>
+                    <dd className="inline text-slate-400">
+                      {u.national_id_number ?? "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-slate-600">Joined: </dt>
+                    <dd className="inline text-slate-400">
+                      {u.created_at
+                        ? new Date(u.created_at).toLocaleDateString()
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => openEdit(u)}
+                    className="flex-1 rounded-lg border border-slate-700 bg-slate-900/20 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 h-11"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => void deleteUser(u.id)}
+                    className="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50 h-11"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop/tablet: table view */}
+      <div className="mt-6 hidden md:block overflow-x-visible">
         <table className="w-full table-fixed text-left text-sm">
           <thead>
             <tr className="text-slate-400">
@@ -157,11 +226,25 @@ export function AdminUsers() {
                   <td className="py-3 text-slate-200">{u.phone ?? "—"}</td>
                   <td className="py-3 text-slate-200">{u.national_id_number ?? "—"}</td>
                   <td className="py-3 text-slate-200">{u.verification_status ?? "pending"}</td>
-                  <td className="py-3 text-slate-200">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="py-3 text-slate-200">
+                    {u.created_at
+                      ? new Date(u.created_at).toLocaleDateString()
+                      : "—"}
+                  </td>
                   <td className="py-3">
                     <div className="flex gap-2">
-                      <button onClick={() => openEdit(u)} className="rounded border border-slate-700 px-2 py-1 text-sm text-slate-200">Edit</button>
-                      <button onClick={() => void deleteUser(u.id)} className="rounded bg-rose-600 px-2 py-1 text-sm font-semibold text-white">Delete</button>
+                      <button
+                        onClick={() => openEdit(u)}
+                        className="rounded border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => void deleteUser(u.id)}
+                        className="rounded bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -174,8 +257,8 @@ export function AdminUsers() {
       <div className="mt-4 flex items-center justify-between">
         <div className="text-sm text-slate-400">Page {page} of {totalPages}</div>
         <div className="flex gap-2">
-          <button disabled={page <= 1 || isPending} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-700 px-3 py-1 text-sm text-slate-200">Prev</button>
-          <button disabled={page >= totalPages || isPending} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="rounded border border-slate-700 px-3 py-1 text-sm text-slate-200">Next</button>
+          <button disabled={page <= 1 || isPending} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-11 rounded border border-slate-700 px-3 py-1 text-sm text-slate-200">Prev</button>
+          <button disabled={page >= totalPages || isPending} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-11 rounded border border-slate-700 px-3 py-1 text-sm text-slate-200">Next</button>
         </div>
       </div>
 
@@ -216,3 +299,4 @@ export function AdminUsers() {
 }
 
 export default AdminUsers;
+

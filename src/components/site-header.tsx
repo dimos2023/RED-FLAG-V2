@@ -74,7 +74,7 @@ export function SiteHeader() {
   };
 
   const linkBaseClasses =
-    "rounded-lg px-2 py-1 transition-colors duration-200 ease-out";
+    "rounded-lg px-2 py-1.5 sm:px-2 sm:py-1 transition-colors duration-200 ease-out text-sm sm:text-base h-9 sm:h-auto flex items-center justify-center sm:justify-start";
 
   const linkClass = (href: string) =>
     `${linkBaseClasses} ${
@@ -233,7 +233,7 @@ export function SiteHeader() {
           </button>
         </div>
       ) : null}
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-2.5 sm:px-6">
         <Link href="/" className="group flex items-center gap-2">
           <span className="relative h-6 w-5 overflow-hidden rounded-[2px] [clip-path:polygon(50%_0%,96%_18%,86%_84%,50%_100%,14%_84%,4%_18%)] ring-1 ring-red-300/50 shadow-[0_0_16px_rgba(220,38,38,0.45)]">
             <span className="absolute inset-0 bg-gradient-to-b from-slate-100 via-slate-300 to-slate-700" />
@@ -372,7 +372,7 @@ export function SiteHeader() {
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-900"
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-900 min-w-[44px]"
             aria-expanded={isMobileMenuOpen}
             aria-label={isMobileMenuOpen ? copy.close : copy.menu}
           >
@@ -382,25 +382,25 @@ export function SiteHeader() {
       </div>
       {isMobileMenuOpen ? (
         <div className="border-t border-slate-800/80 bg-slate-950/95 px-4 py-3 lg:hidden">
-          <div className="mx-auto grid max-w-6xl gap-2 text-sm">
+          <div className="mx-auto grid max-w-6xl gap-1.5 text-sm">
             <Link
               href="/"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+              className="rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-900 hover:text-slate-100 break-words h-11 flex items-center"
             >
               {copy.home}
             </Link>
             <Link
               href="/about"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+              className="rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-900 hover:text-slate-100 break-words h-11 flex items-center"
             >
               {copy.about}
             </Link>
             <Link
               href="/policies"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+              className="rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-900 hover:text-slate-100 break-words h-11 flex items-center"
             >
               {copy.policies}
             </Link>

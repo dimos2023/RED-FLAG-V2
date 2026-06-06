@@ -69,25 +69,25 @@ export default function SearchFlagModal({ open, flag, results, isArabic, onClose
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 12, opacity: 0 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="w-full max-w-3xl rounded-2xl border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-slate-900/80 p-8"
+            className="w-full max-w-lg rounded-2xl border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-slate-900/80 p-4 sm:p-8"
           >
-            <div className="flex items-center gap-6">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-600/10 ring-2 ring-emerald-400 animate-[pulse_2s_infinite]">
-                <svg className="h-12 w-12 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
+              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600/10 ring-2 ring-emerald-400 animate-[pulse_2s_infinite] sm:h-24 sm:w-24">
+                <svg className="h-8 w-8 text-emerald-400 sm:h-12 sm:w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 6L9 17l-5-5" />
                 </svg>
               </div>
-              <div>
-                <h3 className="text-2xl font-bold text-emerald-300">{greenText.title}</h3>
-                <p className="mt-2 text-slate-200">{greenText.body}</p>
+              <div className="text-center sm:text-left">
+                <h3 className="text-lg font-bold text-emerald-300 sm:text-2xl">{greenText.title}</h3>
+                <p className="mt-1 text-xs text-slate-200 sm:mt-2 sm:text-sm">{greenText.body}</p>
               </div>
             </div>
-            <div className="mt-6 flex justify-end">
+            <div className="mt-4 flex justify-center sm:mt-6 sm:justify-end">
               <button
                 onClick={() => {
                   onClose();
                 }}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 h-11 min-w-24"
               >
                 {greenText.close}
               </button>
@@ -112,45 +112,44 @@ export default function SearchFlagModal({ open, flag, results, isArabic, onClose
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 12, opacity: 0 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="w-full max-w-3xl rounded-2xl border border-red-500 animate-pulse bg-slate-900/85 p-8"
+            className="w-full max-w-lg rounded-2xl border border-red-500 animate-pulse bg-slate-900/85 p-4 sm:p-8 overflow-y-auto max-h-[90vh]"
           >
-            <div className="flex items-start gap-6">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-red-600/10 ring-2 ring-red-400">
-                <svg className="h-12 w-12 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-6 sm:items-start">
+              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-red-600/10 ring-2 ring-red-400 mx-auto sm:mx-0 sm:h-24 sm:w-24">
+                <svg className="h-8 w-8 text-red-400 sm:h-12 sm:w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M21 12A9 9 0 1112 3a9 9 0 019 9z" />
                 </svg>
               </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-red-300">{redText.title}</h3>
-                <p className="mt-2 text-slate-200">{redText.body}</p>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-lg font-bold text-red-300 sm:text-2xl">{redText.title}</h3>
+                <p className="mt-1 text-xs text-slate-200 sm:mt-2 sm:text-sm">{redText.body}</p>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-3">
                   {results.slice(0, 5).map((r) => (
-                    <div key={r.id} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                      <p className="text-sm font-semibold text-slate-100">{r.entityName}</p>
-                      <p className="mt-1 text-xs text-slate-400">{r.summary}</p>
-                      <p className="mt-1 text-xs text-amber-200/90">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"} · {r.hasEvidence ? "Evidence available" : "No evidence"}</p>
+                    <div key={r.id} className="rounded-lg border border-slate-800 bg-slate-950/40 p-2 sm:p-3">
+                      <p className="text-xs font-semibold text-slate-100 sm:text-sm break-words">{r.entityName}</p>
+                      <p className="mt-0.5 text-xs text-slate-400 break-words sm:mt-1">{r.summary}</p>
+                      <p className="mt-0.5 text-xs text-amber-200/90 sm:mt-1">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"} · {r.hasEvidence ? "Evidence" : "No evidence"}</p>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-between">
+            <div className="mt-4 flex flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-between">
               <button
                 onClick={() => {
                   onClose();
                 }}
-                className="rounded-lg border border-slate-700 bg-transparent px-4 py-2 text-sm text-slate-300"
+                className="rounded-lg border border-slate-700 bg-transparent px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 h-11 order-2 sm:order-1"
               >
                 {redText.close}
               </button>
               <button
                 onClick={() => {
-                  // allow user to view full results in page (close modal only)
                   onClose();
                 }}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 h-11 order-1 sm:order-2"
               >
                 {isArabic ? "عرض التفاصيل" : "View details"}
               </button>
