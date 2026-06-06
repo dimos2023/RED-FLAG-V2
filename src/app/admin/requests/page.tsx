@@ -57,7 +57,7 @@ export default function AdminRequestsPage() {
   }, [supabase]);
 
   // client-side filtered view based on activeTab
-  const visibleRows = rows.filter((r) => {
+  const filteredReports = rows.filter((r) => {
     if (activeTab === "all") return true;
     return r.review_status === activeTab;
   });
@@ -86,6 +86,30 @@ export default function AdminRequestsPage() {
 
   useEffect(() => {
     void loadReports();
+
+    // subscribe to realtime changes for reports table to keep admin view live
+    const channel = supabase
+      .channel("public:reports")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "reports" },
+        () => void loadReports(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "reports" },
+        () => void loadReports(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "reports" },
+        () => void loadReports(),
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [loadReports]);
 
   async function executeReview(next: ReportReviewStatus) {
@@ -161,43 +185,28 @@ export default function AdminRequestsPage() {
       ) : (
         <>
           <div className="mt-8 grid gap-3 md:hidden">
-            {rows.length === 0 ? (
+            {filteredReports.length === 0 ? (
               <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-500">
                 No reports in this view.
               </div>
             ) : (
-              visibleRows.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
-                >
+              filteredReports.map((r) => (
+                <div key={r.id} className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-200">
-                        {r.subject_name ?? r.title ?? "Unnamed entity"}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {new Date(r.created_at).toLocaleString()}
-                      </p>
+                      <p className="truncate font-medium text-slate-200">{r.subject_name ?? r.title ?? "Unnamed entity"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{new Date(r.created_at).toLocaleString()}</p>
                     </div>
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        r.review_status === "pending"
-                          ? "bg-amber-950/80 text-amber-200"
-                          : r.review_status === "approved"
-                            ? "bg-emerald-950/80 text-emerald-200"
-                            : "bg-red-950/80 text-red-200"
-                      }`}
-                    >
-                      {r.review_status}
-                    </span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      r.review_status === "pending"
+                        ? "bg-amber-950/80 text-amber-200"
+                        : r.review_status === "approved"
+                          ? "bg-emerald-950/80 text-emerald-200"
+                          : "bg-red-950/80 text-red-200"
+                    }`}>{r.review_status}</span>
                   </div>
-                  <p className="mt-2 line-clamp-2 text-xs text-slate-500">
-                    {r.subject_address}
-                  </p>
-                  <p className="mt-1 font-mono text-xs text-slate-600">
-                    …{r.owner_id ? r.owner_id.slice(-8) : "—"}
-                  </p>
+                  <p className="mt-2 line-clamp-2 text-xs text-slate-500">{r.subject_address}</p>
+                  <p className="mt-1 font-mono text-xs text-slate-600">…{r.owner_id ? r.owner_id.slice(-8) : "—"}</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -224,7 +233,7 @@ export default function AdminRequestsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
-              {rows.length === 0 ? (
+              {filteredReports.length === 0 ? (
                 <tr>
                   <td
                     colSpan={5}
@@ -234,7 +243,7 @@ export default function AdminRequestsPage() {
                   </td>
                 </tr>
               ) : (
-                visibleRows.map((r) => (
+                filteredReports.map((r) => (
                   <tr key={r.id} className="bg-slate-950/40 hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-200">
                       {r.subject_name ?? r.title ?? "Unnamed entity"}
