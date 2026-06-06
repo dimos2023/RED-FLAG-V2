@@ -1,15 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { Suspense, useMemo, type MouseEvent } from "react";
+import { useMemo, type MouseEvent } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { SiteHeader } from "@/components/site-header";
 import { useLanguage } from "@/contexts/language-context";
 
-const EarthBackground = dynamic(
-  () => import("@/components/earth-background").then((mod) => mod.EarthBackground),
-  { ssr: false },
-);
 
 type PolicySection = {
   title: string;
@@ -166,9 +161,7 @@ export default function PoliciesPage() {
       className="relative min-h-dvh overflow-hidden bg-[#050712] text-slate-100"
     >
       <SiteHeader />
-      <Suspense fallback={null}>
-        <EarthBackground />
-      </Suspense>
+      
       <main className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-12 max-w-4xl space-y-6">
           <p className="text-sm uppercase tracking-[0.35em] text-emerald-300/70">Secure · Transparent · Immersive</p>

@@ -1,18 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { useState, useRef } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useLanguage } from "@/contexts/language-context";
 
-const EarthBackground = dynamic(
-  () => import("@/components/earth-background").then((mod) => mod.EarthBackground),
-  {
-    ssr: false,
-    loading: () => null,
-  },
-);
 
 type CardSection = {
   title: string;
@@ -149,7 +141,6 @@ export default function AboutPage() {
       className="min-h-dvh bg-transparent"
       dir={isArabic ? "rtl" : "ltr"}
     >
-      <EarthBackground />
       <SiteHeader />
       <main className="relative z-10 mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
         <motion.div

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import { AppProviders } from "@/components/providers";
+import InternalBackground from "@/components/InternalBackground";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,7 +42,10 @@ export default function RootLayout({
           minHeight: "100dvh",
         }}
       >
-        <AppProviders supabasePublic={supabasePublic}>{children}</AppProviders>
+        <AppProviders supabasePublic={supabasePublic}>
+          <InternalBackground />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );
