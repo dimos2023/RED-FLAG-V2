@@ -76,11 +76,9 @@ export async function POST(request: Request) {
   });
 
   const orFilter = [
+    `subject_phone.eq.${query}`,
+    `subject_cr.eq.${query}`,
     `subject_name.ilike.%${query}%`,
-    `subject_cr.ilike.%${query}%`,
-    `subject_phone.ilike.%${query}%`,
-    `subject_address.ilike.%${query}%`,
-    `logo_storage_path.ilike.%${query}%`,
   ].join(",");
 
   const { data: reportRows, error: reportsError } = await adminClient
