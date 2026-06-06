@@ -40,7 +40,7 @@ export function PageTransitionShell({
 }: {
   children: ReactNode;
 }): ReactNode {
-  const pathname: string = usePathname();
+  const pathname: string = usePathname() ?? "";
   const { reducedMotion, allowHeavy3D } = useMediaCapabilities();
   const [routeTick, setRouteTick] = useState<number>(0);
   const [canvasDeferred, setCanvasDeferred] = useState<boolean>(false);

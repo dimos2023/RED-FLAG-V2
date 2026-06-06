@@ -10,7 +10,7 @@ import { useLanguage } from "@/contexts/language-context";
 
 function ForbiddenAdminNotice({ isArabic }: { isArabic: boolean }) {
   const searchParams = useSearchParams();
-  if (searchParams.get("notice") !== "forbidden-admin") {
+  if (searchParams?.get("notice") !== "forbidden-admin") {
     return null;
   }
   return (

@@ -33,7 +33,7 @@ import { uploadFraudEvidence } from "@/lib/supabase/storage";
 function CompleteRegistrationInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reason: string | null = searchParams.get("reason");
+  const reason: string | null = searchParams?.get("reason") ?? null;
   const { user, supabaseUser, isHydrated, refreshSessionFromSupabase, completeVerification } =
     useAuth();
   const { isArabic } = useLanguage();

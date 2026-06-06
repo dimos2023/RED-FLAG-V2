@@ -1,0 +1,25 @@
+
+> red-flag@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.15
+   - Environments: .env.local
+   - Experiments (use with caution):
+     ⨯ devtoolSegmentExplorer
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 6.1s
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/app/complete-registration/page.tsx:36:33
+Type error: 'searchParams' is possibly 'null'.
+
+[0m [90m 34 |[39m   [36mconst[39m router [33m=[39m useRouter()[33m;[39m
+ [90m 35 |[39m   [36mconst[39m searchParams [33m=[39m useSearchParams()[33m;[39m
+[31m[1m>[22m[39m[90m 36 |[39m   [36mconst[39m reason[33m:[39m string [33m|[39m [36mnull[39m [33m=[39m searchParams[33m.[39m[36mget[39m([32m"reason"[39m)[33m;[39m
+ [90m    |[39m                                 [31m[1m^[22m[39m
+ [90m 37 |[39m   [36mconst[39m { user[33m,[39m supabaseUser[33m,[39m isHydrated[33m,[39m refreshSessionFromSupabase[33m,[39m completeVerification } [33m=[39m
+ [90m 38 |[39m     useAuth()[33m;[39m
+ [90m 39 |[39m   [36mconst[39m { isArabic } [33m=[39m useLanguage()[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null

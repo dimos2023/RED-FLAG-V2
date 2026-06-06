@@ -1,0 +1,27 @@
+
+> red-flag@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.15
+   - Environments: .env.local
+   - Experiments (use with caution):
+     ⨯ devtoolSegmentExplorer
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 6.1s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/24) ...
+   Generating static pages (6/24) 
+   Generating static pages (12/24) 
+   Generating static pages (18/24) 
+ ✓ Generating static pages (24/24)
+
+> Build error occurred
+[Error: ENOENT: no such file or directory, rename 'e:\My Web Sites\RED-FLAG V2\.next\export\500.html' -> 'e:\My Web Sites\RED-FLAG V2\.next\server\pages\500.html'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'rename',
+  path: 'e:\\My Web Sites\\RED-FLAG V2\\.next\\export\\500.html',
+  dest: 'e:\\My Web Sites\\RED-FLAG V2\\.next\\server\\pages\\500.html'
+}

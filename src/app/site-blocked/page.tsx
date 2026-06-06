@@ -9,7 +9,7 @@ import { useLanguage } from "@/contexts/language-context";
 function SiteBlockedContent() {
   const searchParams = useSearchParams();
   const { isArabic } = useLanguage();
-  const reason: string | null = searchParams.get("reason");
+  const reason: string | null = searchParams?.get("reason") ?? null;
   const copy = useMemo(() => {
     const isBan: boolean =
       reason === "admin_permanent" || reason === "admin_abuse";

@@ -13,7 +13,7 @@ type AdminShellProps = {
 
 export function AdminShell({ children }: AdminShellProps) {
   const router = useRouter();
-  const pathname: string = usePathname();
+  const pathname: string = usePathname() ?? "";
   const { user, isAdmin, isAdminRoleResolved, isHydrated, hasSupabase } =
     useAuth();
   const lastUserIdRef = useRef<string | undefined>(undefined);

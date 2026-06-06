@@ -29,12 +29,12 @@ function LoginPageContent() {
   const [googleError, setGoogleError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(false);
   const gateMessage = useMemo(() => {
-    return searchParams.get("reason") === "mandatory-search"
+    return searchParams?.get("reason") === "mandatory-search"
       ? "Mandatory registration required to search or access data."
       : "";
   }, [searchParams]);
   const forbiddenAdminMessage = useMemo(() => {
-    if (searchParams.get("notice") !== "forbidden-admin") {
+    if (searchParams?.get("notice") !== "forbidden-admin") {
       return "";
     }
     return isArabic
@@ -42,7 +42,7 @@ function LoginPageContent() {
       : "You do not have access to the admin panel.";
   }, [searchParams, isArabic]);
   const oauthError = useMemo(() => {
-    const raw: string | null = searchParams.get("error");
+    const raw: string | null = searchParams?.get("error") ?? null;
     if (!raw) {
       return "";
     }
@@ -111,7 +111,7 @@ function LoginPageContent() {
           setError(copy.adminCheckTimeout);
         }
         const nextSafe: string | null = sanitizeInternalNextPath(
-          searchParams.get("next"),
+          searchParams?.get("next") ?? null,
         );
         if (nextSafe) {
           setPending(false);

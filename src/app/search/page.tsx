@@ -27,7 +27,7 @@ function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isArabic } = useLanguage();
-  const [query, setQuery] = useState<string>(searchParams.get("q") ?? "");
+  const [query, setQuery] = useState<string>(searchParams?.get("q") ?? "");
   const [active, setActive] = useState<EvidenceRequestHit | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -125,7 +125,7 @@ function SearchPageContent() {
   }
 
   useEffect(() => {
-    const fromUrl: string = (searchParams.get("q") ?? "").trim();
+    const fromUrl: string = (searchParams?.get("q") ?? "").trim();
     if (fromUrl.length >= 2) {
       setQuery(fromUrl);
       void executeSearch(fromUrl);

@@ -69,12 +69,12 @@ function RegisterPageContent() {
     "idle" | "auth" | "upload" | "profile"
   >("idle");
   const gateMessage = useMemo(() => {
-    return searchParams.get("reason") === "mandatory-search"
+    return searchParams?.get("reason") === "mandatory-search"
       ? "Mandatory registration required to search or access data."
       : "";
   }, [searchParams]);
   const oauthUrlError = useMemo(() => {
-    const raw: string | null = searchParams.get("error");
+    const raw: string | null = searchParams?.get("error") ?? null;
     if (!raw) {
       return "";
     }
@@ -447,7 +447,7 @@ function RegisterPageContent() {
     if (!isHydrated || !hasSupabase) {
       return;
     }
-    if (searchParams.get("finish") !== "1") {
+    if (searchParams?.get("finish") !== "1") {
       return;
     }
     if (resumeAttemptedRef.current) {

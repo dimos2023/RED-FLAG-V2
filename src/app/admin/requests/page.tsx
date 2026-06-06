@@ -85,39 +85,50 @@ export default function AdminRequestsPage() {
   }
 
   useEffect(() => {
-    // 1. شرط الحماية لمنع خطأ 'possibly null'
     if (!supabase) return;
 
     const fetchReports = async () => {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        setRows(data as AdminReportRow[]);
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('reports')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          setRows(data as AdminReportRow[]);
+        } else if (error) {
+          console.error('Supabase error:', error.message);
+        }
+      } catch (err) {
+        console.error('Fetch catch error:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchReports();
 
-    // Realtime subscription
     const channel = supabase
-      .channel("public:reports")
+      .channel('admin_reports_realtime')
       .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reports" },
-        (payload) => {
-          // تعامل مع التحديثات اللحظية هنا لإبقاء اللوحة حية
-          fetchReports(); 
-        }
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reports' },
+        () => {
+          supabase
+            .from('reports')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .then(({ data }) => {
+              if (data) setRows(data as AdminReportRow[]);
+            });
+        },
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  // 2. إضافة supabase هنا لحل تحذير الـ Linting
   }, [supabase]);
 
   async function executeReview(next: ReportReviewStatus) {
@@ -186,12 +197,15 @@ export default function AdminRequestsPage() {
           {error}
         </p>
       ) : null}
-      {loading ? (
+      {loading && rows.length === 0 ? (
         <div className="mt-10 flex justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-red-500" />
         </div>
       ) : (
         <>
+          {loading && rows.length > 0 ? (
+            <p className="mt-6 text-sm text-slate-400">Updating report list…</p>
+          ) : null}
           <div className="mt-8 grid gap-3 md:hidden">
             {filteredReports.length === 0 ? (
               <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-500">

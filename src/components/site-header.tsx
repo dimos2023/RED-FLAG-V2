@@ -25,7 +25,7 @@ export function SiteHeader() {
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const languageMobileMenuRef = useRef<HTMLDivElement | null>(null);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { user, isHydrated, signOut, adminRoleCheckNotice, dismissAdminRoleCheckNotice } =
     useAuth();
   const { isAdmin, isAdminResolved } = useAdminStatus();
