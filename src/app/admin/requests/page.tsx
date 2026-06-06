@@ -1,18 +1,29 @@
 "use client";
 
+/*
+Cursor Prompt:
+
+"يا كيرسل، لوحة الأدمن تظهر خطأ `column reports.name does not exist` والجدول فارغ كما في الصورة `image_01b9e2.jpg`. بالإضافة إلى أننا نريد تفعيل الفلاتر (Tabs) بشكل كامل لفصل البلاغات.**المطلوب تنفيذه بدقة فوراً:**
+1. إصلاح جلب البيانات واستبدال العمود القديم: ابحث في استعلام الـ Supabase (سواء في الـ API Route الخاص بالأدمن أو داخل الكومبوننت) واستبدل أي محاولة لقراءة `row.name` أو `reports.name` بالعمود الجديد الصحيح: `subject_name`. في الجدول (Table Rows)، اجعل خانة الـ SUBJECT تعرض `row.subject_name` وعنوان البلاغ `row.title` لتظهر البيانات التي حقناها في الـ Script بنجاح.
+2. تفعيل أزرار التصفية الفوقية (Pending / Approved / Rejected / All): اربط الأزرار الأربعة بحالة نشطة (`useState` باسم `activeTab`). قم بعمل فلترة للمصفوفة القادمة من الداتابيز (`reports`) بناءً على الزر النشط كما هو مطلوب.
+3. إضافة أزرار التحكم للأدمن (Actions): في خانة الـ ACTION في الـ `Pending view`، تأكد من وجود زرين تفاعليين: زر Approve لتحديث `review_status` إلى `'approved'`، وزر Reject لتحديثها إلى `'rejected'`.
+4. الأمان واستقرار الـ Types: تأكد من استخدام "use client" لوجود الـ State والتفاعلات، واستخدم الأنواع الصارمة لبيانات الـ `Report` لتجنب فشل الـ Build.
+"
+*/
+
 import { useCallback, useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { FraudReportRow, ReportReviewStatus } from "@/types";
 
 type AdminReportRow = FraudReportRow & {
-  name?: string | null;
+  title?: string | null;
 };
 
 type FilterStatus = "all" | ReportReviewStatus;
 
 export default function AdminRequestsPage() {
   const supabase = createSupabaseBrowserClient();
-  const [filter, setFilter] = useState<FilterStatus>("pending");
+  const [activeTab, setActiveTab] = useState<FilterStatus>("pending");
   const [rows, setRows] = useState<AdminReportRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -28,16 +39,13 @@ export default function AdminRequestsPage() {
     }
     setLoading(true);
     setError("");
-    let query = supabase
+    const query = supabase
       .schema("public")
       .from("reports")
       .select(
-        "id, owner_id, subject_name, name, subject_phone, subject_cr, subject_address, review_status, reviewed_by, reviewed_at, admin_note, logo_storage_path, created_at",
+        "id, owner_id, subject_name, subject_phone, subject_cr, subject_address, review_status, reviewed_by, reviewed_at, admin_note, logo_storage_path, created_at, title",
       )
       .order("created_at", { ascending: false });
-    if (filter !== "all") {
-      query = query.eq("review_status", filter);
-    }
     const { data, error: qErr } = await query;
     setLoading(false);
     if (qErr) {
@@ -46,7 +54,35 @@ export default function AdminRequestsPage() {
       return;
     }
     setRows((data ?? []) as AdminReportRow[]);
-  }, [supabase, filter]);
+  }, [supabase]);
+
+  // client-side filtered view based on activeTab
+  const visibleRows = rows.filter((r) => {
+    if (activeTab === "all") return true;
+    return r.review_status === activeTab;
+  });
+
+  async function updateReportStatus(id: string, status: ReportReviewStatus) {
+    if (!supabase) return;
+    setActionPending(true);
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) {
+      setActionPending(false);
+      return;
+    }
+    const { error } = await supabase
+      .schema("public")
+      .from("reports")
+      .update({ review_status: status, reviewed_by: authData.user.id, reviewed_at: new Date().toISOString() })
+      .eq("id", id);
+    setActionPending(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    // update local state for immediate UI feedback
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, review_status: status } : r)));
+  }
 
   useEffect(() => {
     void loadReports();
@@ -92,20 +128,18 @@ export default function AdminRequestsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["pending", "Pending"],
-              ["approved", "Approved"],
-              ["rejected", "Rejected"],
-              ["all", "All"],
-            ] as const
-          ).map(([value, label]) => (
+          {([
+            ["pending", "Pending"],
+            ["approved", "Approved"],
+            ["rejected", "Rejected"],
+            ["all", "All"],
+          ] as const).map(([value, label]) => (
             <button
               key={value}
               type="button"
-              onClick={() => setFilter(value)}
+              onClick={() => setActiveTab(value)}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-                filter === value
+                activeTab === value
                   ? "bg-red-600 text-white"
                   : "border border-slate-700 text-slate-400 hover:bg-slate-900"
               }`}
@@ -132,7 +166,7 @@ export default function AdminRequestsPage() {
                 No reports in this view.
               </div>
             ) : (
-              rows.map((r) => (
+              visibleRows.map((r) => (
                 <div
                   key={r.id}
                   className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
@@ -140,7 +174,7 @@ export default function AdminRequestsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-medium text-slate-200">
-                        {r.subject_name ?? r.name ?? "Unnamed entity"}
+                        {r.subject_name ?? r.title ?? "Unnamed entity"}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {new Date(r.created_at).toLocaleString()}
@@ -162,7 +196,7 @@ export default function AdminRequestsPage() {
                     {r.subject_address}
                   </p>
                   <p className="mt-1 font-mono text-xs text-slate-600">
-                    …{r.owner_id.slice(-8)}
+                    …{r.owner_id ? r.owner_id.slice(-8) : "—"}
                   </p>
                   <button
                     type="button"
@@ -200,10 +234,10 @@ export default function AdminRequestsPage() {
                   </td>
                 </tr>
               ) : (
-                rows.map((r) => (
+                visibleRows.map((r) => (
                   <tr key={r.id} className="bg-slate-950/40 hover:bg-slate-900/40">
                     <td className="px-4 py-3 font-medium text-slate-200">
-                      {r.subject_name ?? r.name ?? "Unnamed entity"}
+                      {r.subject_name ?? r.title ?? "Unnamed entity"}
                       <p className="mt-0.5 line-clamp-2 text-xs font-normal text-slate-500">
                         {r.subject_address}
                       </p>
@@ -222,23 +256,31 @@ export default function AdminRequestsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                      …{r.owner_id.slice(-8)}
+                      …{r.owner_id ? r.owner_id.slice(-8) : "—"}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {new Date(r.created_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {r.review_status === "pending" ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelected(r);
-                            setNote(r.admin_note ?? "");
-                          }}
-                          className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 ring-1 ring-slate-700 hover:bg-slate-700"
-                        >
-                          Review
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void updateReportStatus(r.id, "rejected")}
+                            disabled={actionPending}
+                            className="rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-950/70 disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateReportStatus(r.id, "approved")}
+                            disabled={actionPending}
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -283,7 +325,7 @@ export default function AdminRequestsPage() {
                 ? "Decision"
                 : "Report details"}
             </h3>
-            <p className="mt-2 text-sm text-slate-400">{selected.subject_name ?? selected.name ?? "Unnamed entity"}</p>
+            <p className="mt-2 text-sm text-slate-400">{selected.subject_name ?? selected.title ?? "Unnamed entity"}</p>
             <dl className="mt-4 space-y-1 text-xs text-slate-500">
               <div>
                 <dt className="inline text-slate-600">Phone: </dt>
