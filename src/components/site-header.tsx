@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { type SVGProps, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { UserIcon } from "lucide-react";
 import { useAdminStatus } from "@/hooks/use_admin_status";
 import { useAuth } from "@/contexts/auth-context";
 import { useLanguage } from "@/contexts/language-context";
@@ -82,6 +83,8 @@ export function SiteHeader() {
         ? "bg-emerald-600/15 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.12)]"
         : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
     }`;
+  const mobileAccountLinkClasses =
+    "block w-full rounded-lg px-4 py-3 text-slate-200 transition-colors duration-200 hover:bg-slate-800/50";
 
   const userLabel =
     user?.fullName?.trim() || user?.email?.trim() ||
@@ -411,7 +414,7 @@ export function SiteHeader() {
                 <Link
                   href="/login"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+                  className={mobileAccountLinkClasses}
                 >
                   {copy.signIn}
                 </Link>
@@ -426,6 +429,16 @@ export function SiteHeader() {
             ) : !isAdminResolved ? (
               <>
                 <span className="h-8 w-full animate-pulse rounded-lg bg-slate-800" />
+                <Link
+                  href="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={mobileAccountLinkClasses}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    <span>{copy.profile}</span>
+                  </span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => {
@@ -469,6 +482,16 @@ export function SiteHeader() {
                 >
                   {copy.report}
                 </Link>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={mobileAccountLinkClasses}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    <span>{copy.profile}</span>
+                  </span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => {
@@ -489,6 +512,16 @@ export function SiteHeader() {
                 >
                   {copy.admin}
                 </Link>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={mobileAccountLinkClasses}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    <span>{copy.profile}</span>
+                  </span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => {
@@ -508,6 +541,16 @@ export function SiteHeader() {
                   className="rounded-lg px-3 py-2 text-amber-300 hover:bg-slate-900"
                 >
                   {copy.completeVerification}
+                </Link>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={mobileAccountLinkClasses}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <UserIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                    <span>{copy.profile}</span>
+                  </span>
                 </Link>
                 <button
                   type="button"
