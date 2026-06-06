@@ -85,32 +85,40 @@ export default function AdminRequestsPage() {
   }
 
   useEffect(() => {
-    void loadReports();
+    // 1. شرط الحماية لمنع خطأ 'possibly null'
+    if (!supabase) return;
 
-    // subscribe to realtime changes for reports table to keep admin view live
+    const fetchReports = async () => {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setRows(data as AdminReportRow[]);
+      }
+    };
+
+    fetchReports();
+
+    // Realtime subscription
     const channel = supabase
       .channel("public:reports")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "reports" },
-        () => void loadReports(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "reports" },
-        () => void loadReports(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "reports" },
-        () => void loadReports(),
+        { event: "*", schema: "public", table: "reports" },
+        (payload) => {
+          // تعامل مع التحديثات اللحظية هنا لإبقاء اللوحة حية
+          fetchReports(); 
+        }
       )
       .subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
-  }, [loadReports]);
+  // 2. إضافة supabase هنا لحل تحذير الـ Linting
+  }, [supabase]);
 
   async function executeReview(next: ReportReviewStatus) {
     if (!supabase || !selected) {
